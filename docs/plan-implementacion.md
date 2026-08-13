@@ -1,338 +1,235 @@
 # Plan de implementación — Moderador ITAMMUN
 
-**Estado:** segundo borrador incorporando retroalimentación  
-**Fecha:** 12 de agosto de 2026  
-**Objetivo:** validar una primera consola operativa antes de completar mociones, votación, bitácora y reportes.
+**Estado:** primera versión local implementada
 
-## 1. Decisiones confirmadas
+**Fecha:** 12 de agosto de 2026
 
-- La aplicación no tendrá acceso ni cuentas en esta etapa. Cualquier persona con el enlace podrá abrirla.
-- La página inicial ofrece todos los comités de ITAMMUN 2026 y un lienzo en blanco.
-- Elegir un comité abre directamente su consola. No existe una pantalla separada de sincronización ni de configuración.
-- Varias personas pueden abrir la URL del mismo comité; el estado compartido se guarda por `committee_key` en PostgreSQL.
-- La consola permite agregar oradores libremente, incluso escribiendo un nombre que no esté en el catálogo.
-- El tópico se define dentro de la consola y es obligatorio antes de abrir el pase de lista.
-- El pase de lista usa un menú desplegable con texto y color para cada estado.
-- Todo tiempo configurable se escribe con teclado en formato `MM:SS` o `HH:MM:SS` y se confirma con Enter.
-- `−1 segundo` se retira de los cronómetros normales. Sólo aparece al preparar una extensión de caucus.
-- El despliegue recomendado sigue siendo una PWA en `moderador.itammun.itam.mx`.
+**Objetivo:** validar el flujo de moderación con las organizadoras antes de conectar el catálogo real.
 
-## 2. Investigación y criterio de protocolo
+## 1. Decisiones incorporadas
 
-### Agenda y tópico
+- Sin cuentas. En local, cualquier persona con la URL puede entrar.
+- Al publicar se puede definir una única contraseña para todo el subdominio.
+- PostgreSQL será únicamente la fuente del catálogo: comités, colores, tópicos, países y banderas.
+- El estado operativo del debate no se escribe en PostgreSQL; vive en el navegador.
+- Inicio permite elegir un comité o crear un lienzo en blanco.
+- Después de elegir se abre `Setup`: primero se define tópico y participantes; después se pasa a la consola.
+- El lienzo en blanco admite participantes escritos libremente.
+- Observadores aparecen en sala, pero no cuentan para quórum, mayorías ni votación.
+- Todos los tiempos se escriben con teclado en `MM:SS` o `HH:MM:SS`.
+- La regla `−1 segundo` sólo aparece al preparar una extensión de caucus.
+- Caucus moderado guarda duración total y tiempo por orador.
+- Las apelaciones viven en Mociones y abren una votación inmediata, no debatible.
+- La votación es nominal por defecto y la pantalla pública muestra quién está votando.
 
-La guía oficial de Model UN de Naciones Unidas explica que la agenda confirma el trabajo preparado antes de la conferencia y que el programa de trabajo define el tiempo destinado a cada punto y a los oradores. MUN Command separa la selección del comité de las acciones `Set Agenda` y `Conduct Roll Call`; no presenta una pantalla general de configuración como requisito previo.
-
-Decisión para ITAMMUN: al abrir la consola, los oradores están disponibles de inmediato, pero **Pase de lista permanece deshabilitado hasta elegir o escribir un tópico**. Esto hace visible la regla sin interponer otra ventana.
-
-Referencias:
-
-- [ONU — Agenda, programa de trabajo y reglas de procedimiento](https://www.un.org/en/model-united-nations/agenda-workplan-documents-and-rules-procedure)
-- [ONU — Desarrollo de la conferencia](https://www.un.org/en/model-united-nations/during-conference)
-- [MUN Command — configuración de comité](https://session.muncommand.com/en/setup)
-
-### Regla de un segundo menos
-
-La interfaz de MUN Manager muestra un control `-0:01`, pero su manual público no documenta que deba descontarse tiempo al reloj activo. La evidencia protocolaria más clara encontrada está en reglas mexicanas de MUN:
-
-- El protocolo alojado por la Cámara de Diputados indica que la extensión de un caucus moderado o inmoderado debe durar menos que el caucus original y que puede ser **un segundo menos**.
-- TECMUN 2025 formula la misma regla para extensiones de caucus.
-- La guía oficial de la ONU no define caucus ni esta regla; advierte que muchos MUN usan procedimientos parlamentarios propios que no son idénticos a los de la ONU.
-
-Decisión de producto: en `Caucus y extensiones`, el sistema propone automáticamente `duración original − 00:01`. La mesa puede escribir un tiempo menor distinto. El sistema no permite que la extensión iguale o supere al caucus original.
-
-Referencias:
-
-- [Protocolo parlamentario alojado por la Cámara de Diputados, arts. 23–24](https://www5.diputados.gob.mx/index.php/esl/content/download/96091/481176/file/G20%20-%20Protocolo.pdf)
-- [TECMUN 2025 — reglas de procedimiento](https://tec.mx/sites/default/files/repositorio/Campus/leon/munmx/documentos/2025/middle-school/1.pdf)
-- [Manual de MUN Manager](https://ssinisterra.wordpress.com/mun-manager/)
-
-Esta regla debe compararse con el protocolo oficial de ITAMMUN cuando esté disponible.
-
-## 3. Datos del sitio y colores
-
-La API pública vigente de ITAMMUN entrega:
-
-- edición, subsecretarías y comités;
-- UUID, slug, nombre, abreviatura, idioma y nivel;
-- tópicos y representaciones por comité;
-- nombre, UUID, bandera y disponibilidad de cada representación.
-
-Endpoint observado: `GET /backend/public/api/public/debates/{committee_uuid}`.
-
-La API pública **no entrega colores** y desde una respuesta HTTP no es posible confirmar el motor físico de la base de producción. Los colores se encontraron en el código visual publicado por el sitio. El repositorio incluye una migración PostgreSQL que los guarda en `moderator.committee_theme`:
-
-| Comité | Acento | Fondo oscuro |
-|---|---:|---:|
-| ONU Mujeres | `#3C98A5` | `#1A3A3E` |
-| ACNUR | `#82BAB7` | `#1C3635` |
-| UNICEF | `#72B7BE` | `#1C3537` |
-| ICJ | `#2D748E` | `#142D36` |
-| UNIDO | `#7A966D` | `#1E2E1A` |
-| CEPA | `#83A33E` | `#242E14` |
-| Banco Mundial | `#3D8D2A` | `#162A12` |
-| Consejo de Seguridad | `#837417` | `#2A2510` |
-| INTERPOL | `#B79D3E` | `#2E2812` |
-| NATO | `#E8B117` | `#332A0C` |
-
-El navegador nunca recibe credenciales PostgreSQL. La API del moderador consulta la base y el sitio consume esa API.
-
-## 4. Flujo actualizado
+## 2. Flujo implementado
 
 ```mermaid
 flowchart LR
-  A[Inicio abierto] --> B{Elegir origen}
-  B -->|Comité 2026| C[Consola con países y tópicos]
-  B -->|Lienzo en blanco| D[Consola vacía]
-  C --> E[Agregar oradores libremente]
+  A["Inicio público"] --> B{"Comité o lienzo"}
+  B -->|"Comité"| C["Setup con catálogo"]
+  B -->|"Lienzo"| D["Setup vacío"]
+  C --> E["Definir tópico"]
   D --> E
-  C --> F[Definir tópico]
-  D --> F
-  F --> G[Pase de lista]
-  G --> H[Debate]
-  H --> I[Caucus y extensiones]
-  H --> J[Mociones]
-  H --> K[Votación]
-  H --> L[Bitácora]
+  E --> F["Elegir o agregar participantes"]
+  F --> G["Crear debate local"]
+  G --> H["Consola"]
+  H --> I["Oradores"]
+  H --> J["Pase de lista"]
+  H --> K["Caucus"]
+  H --> L["Mociones y apelaciones"]
+  H --> M["Votación nominal"]
+  M --> N["Pantalla de proyector"]
+  H --> O["Bitácora"]
 ```
 
-### Acceso compartido
+No existe una pantalla de sincronización. La carga del catálogo ocurre al entrar a inicio/setup. La sesión resultante es local y se sincroniza únicamente entre pestañas del mismo navegador.
 
-```mermaid
-sequenceDiagram
-  actor A as Persona A
-  actor B as Persona B
-  participant W as moderador.itammun.itam.mx
-  participant API as API Moderador
-  participant PG as PostgreSQL
-  A->>W: Abre /comite/onu-mujeres
-  B->>W: Abre la misma URL
-  A->>API: Agrega a Canadá a oradores
-  API->>PG: Guarda estado y aumenta revisión
-  B->>API: Consulta revisión
-  API-->>B: Devuelve lista actualizada
-```
+## 3. Borradores de ventanas
 
-No hay bloqueo exclusivo: varias personas pueden abrir y editar el mismo comité. Para evitar que una actualización antigua sobrescriba otra, cada guardado incluye `baseRevision`; un conflicto recibe la versión más reciente.
-
-En el prototipo, si la API PostgreSQL no está disponible, la consola conserva un borrador local y sincroniza pestañas del mismo navegador. Este modo es contingencia, no sustituye al backend compartido.
-
-## 5. Ventanas revisadas
-
-### V01 — Inicio y selección de comité
+### V01 — Inicio
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ ITAMMUN · Moderador                         Acceso abierto   │
+│ ITAMMUN · Moderador                          Acceso abierto  │
 │                                                              │
 │ ¿Qué comité vas a moderar?                                   │
-│                                                              │
 │ [ONU Mujeres] [ACNUR] [UNICEF] [ICJ]                         │
 │ [UNIDO] [CEPA] [Banco Mundial]                               │
 │ [Consejo de Seguridad] [INTERPOL] [NATO]                     │
 │                                                              │
-│ [+ Lienzo en blanco · nombre opcional]                       │
+│ [Lienzo en blanco · nombre opcional____________] [Crear]    │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Cada tarjeta usa el color vigente de ese comité. No hay cuentas, sesión de acceso ni selección exclusiva.
+Cada comité conserva los colores tomados del sitio ITAMMUN. Seleccionar una tarjeta abre su setup, no la consola directamente.
 
-### V02 — Consola y tópico
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ ONU Mujeres    Borrador local / 2 conectados  [Compartir]   │
-├──────────────────────────────────────────────────────────────┤
-│ TÓPICO: [Seleccionar tópico…                         ▼]      │
-│ Selección obligatoria antes del pase de lista                │
-├──────────────────────────────────────────────────────────────┤
-│ Oradores | Pase de lista🔒 | Caucus | Mociones | Votación   │
-├──────────────────────────────┬───────────────────────────────┤
-│ ORADOR ACTUAL                │ PRÓXIMOS                      │
-│ Canadá                       │ 1. Japón                      │
-│          00:43               │ 2. Alemania                   │
-│ Tiempo [01:00]               │ [nombre libre________][Agregar]│
-│ [Reiniciar] [Pausar] [Sig.] │                               │
-└──────────────────────────────┴───────────────────────────────┘
-```
-
-El tiempo `01:00` es un campo editable con teclado. No contiene controles incrementales ni `−1 s`.
-
-### V03 — Pase de lista
+### V02 — Setup
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ Pase de lista        18/25 presentes · Hay quórum           │
-│ Presentes 18 · Con voto 16 · Simple 9 · Calificada 11      │
-│                                                              │
-│ Canadá                 [● Presente                  ▼]       │
-│ Japón                  [● Presente y votando        ▼]       │
-│ Alemania               [● Ausente                   ▼]       │
-│ Sudán                  [● Observador                ▼]       │
+│ ONU Mujeres                                  Setup debate   │
+├───────────────────────┬──────────────────────────────────────┤
+│ 01 · TÓPICO           │ 02 · PARTICIPANTES             33  │
+│ [Tópico A        ▼]   │ [Buscar___________________________] │
+│ o [Escribir tópico]   │ ☑ 🇲🇽 México                        │
+│                       │ ☑ 🇫🇷 Francia                        │
+│                       │ ☑ Estado de Palestina · Observador │
+│                       │ [Nombre libre__________] [Agregar]  │
+├───────────────────────┴──────────────────────────────────────┤
+│ Tópico A · 33 participantes               [Iniciar debate] │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Los estados se identifican con texto y color:
+Crear setup del mismo comité reemplaza la sesión local anterior. No modifica el catálogo.
 
-- gris: sin registrar;
-- verde: presente;
-- dorado: presente y votando;
-- rojo: ausente;
-- azul: observador.
-
-El color nunca es la única señal. Las fórmulas definitivas se configurarán después de validar el protocolo ITAMMUN.
-
-### V04 — Caucus y extensiones
+### V03 — Consola / oradores
 
 ```text
-┌──────────────────────────────┬───────────────────────────────┐
-│ CAUCUS ACTIVO                │ MOCIÓN DE EXTENSIÓN           │
-│          08:22               │ Duración original 10:00      │
-│ Duración [10:00]             │ Extensión [09:59]             │
-│                              │ [Regla −1 segundo · 09:59]    │
-│ [Reiniciar] [Pausar]         │ [Aplicar extensión]           │
-└──────────────────────────────┴───────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ ONU Mujeres · Guardado local  [Setup] [Pantalla] [Compartir]│
+│ TÓPICO: Tópico A                                            │
+├─────────────────────────────┬────────────────────────────────┤
+│ ORADOR ACTUAL               │ PRÓXIMOS                      │
+│ México                      │ 1. Francia                    │
+│          00:43              │ 2. Nombre libre               │
+│ Tiempo [01:00]              │ [país/persona_______][Agregar]│
+│ [Reiniciar] [Pausar] [Sig.]│                                │
+└─────────────────────────────┴────────────────────────────────┘
 ```
 
-Los dos tiempos se escriben con teclado. Al cambiar el tiempo original, la propuesta de extensión se recalcula a un segundo menos.
+El campo acepta catálogo o texto libre. `Compartir` copia el enlace de setup; no promete colaboración entre dispositivos.
 
-### V05 — Mociones
+### V04 — Pase de lista
 
-Se conserva el borrador anterior. El formulario de nueva moción permitirá seleccionar caucus moderado, inmoderado, extensión, sesión extraordinaria y otros tipos que defina ITAMMUN. Si la moción es una extensión, enviará al módulo V04.
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ 18/33 en sala · 16 con voto · Hay quórum                   │
+│ México                  [● Presente                 ▼]      │
+│ Francia                 [● Presente y votando       ▼]      │
+│ Alemania                [● Ausente                  ▼]      │
+│ Santa Sede              [● Observador               ▼]      │
+└──────────────────────────────────────────────────────────────┘
+```
 
-### V06 — Votación
+Estados: gris `sin registrar`, verde `presente`, dorado `presente y votando`, rojo `ausente`, azul `observador`. El texto siempre acompaña al color.
 
-Se conserva el borrador anterior, sin `−1 s`. Cualquier tiempo requerido por una ronda o explicación se captura mediante teclado en `MM:SS`.
+### V05 — Caucus y extensiones
 
-### V07 — Pantalla pública
+```text
+┌─────────────────────────────┬────────────────────────────────┐
+│ CAUCUS MODERADO             │ EXTENSIÓN                     │
+│          08:22              │ La extensión debe ser menor  │
+│ Total [10:00]               │ Tiempo [09:59]                │
+│ Por orador [00:45]          │ [Regla −1 segundo · 09:59]   │
+│ [Reiniciar] [Pausar]        │ [Aplicar extensión]           │
+└─────────────────────────────┴────────────────────────────────┘
+```
 
-Se conserva el borrador anterior. La pantalla es de sólo lectura y no muestra controles, borradores de voto ni amonestaciones.
+Cambiar el total recalcula la propuesta a un segundo menos. El campo nunca acepta una extensión igual o mayor.
 
-### V08 — Bitácora y estadísticas
+### V06 — Mociones / apelaciones
 
-Se conserva el borrador anterior. El historial registra intervenciones, mociones, extensiones, votaciones y correcciones con revisión y hora.
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ APELACIONES A LA MESA                  Mayoría simple       │
+│ País/persona [México____]  Decisión [Descripción_________] │
+│                                      [Registrar apelación] │
+│ México · decisión procesal       [Abrir votación inmediata]│
+└──────────────────────────────────────────────────────────────┘
+```
 
-### V09 — Cierre y recuperación
+La pregunta se formula como “¿Se revoca la decisión de la Mesa?”. Sólo se revoca si `a favor > en contra`; empate conserva la decisión.
 
-Se conserva el borrador anterior. Cerrar requiere confirmación y no existe una acción ordinaria para borrar la bitácora.
+### V07 — Votación nominal
 
-## 6. Arquitectura
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ VOTACIÓN NOMINAL                         Voto 4 de 16       │
+│                         🇲🇽                                  │
+│                    Emite su voto                            │
+│                        México                               │
+│ [A favor]          [En contra]          [Abstención]       │
+└──────────────────────────────────────────────────────────────┘
+```
+
+La fila se forma con miembros `presente` o `presente y votando`. Los segundos no pueden abstenerse. El resultado muestra votos a favor, en contra y abstenciones.
+
+### V08 — Pantalla de proyector
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ ITAMMUN                                      ONU Mujeres    │
+│                    Voto 4 de 16                             │
+│                         🇲🇽                                  │
+│                    Emite su voto                            │
+│                        México                               │
+└──────────────────────────────────────────────────────────────┘
+```
+
+Es de sólo lectura. Al concluir muestra totales; fuera de votación muestra tópico y orador actual.
+
+### V09 — Bitácora
+
+Registra localmente alta y turno de oradores, extensiones, inicio de votación y resultado de apelaciones. Exportación y marcas de hora quedan para el siguiente sprint.
+
+## 4. Arquitectura actual y futura
 
 ```mermaid
 flowchart TB
-  U1[Persona A · navegador/PWA] -->|HTTPS| API[API Moderador]
-  U2[Persona B · navegador/PWA] -->|HTTPS| API
-  API --> MOD[(PostgreSQL · esquema moderator)]
-  API -->|lectura de catálogo| SITE[API pública/interna ITAMMUN]
-  SITE --> WEBDB[(Base actual del sitio)]
-  U1 --> LOCAL1[(Borrador offline)]
-  U2 --> LOCAL2[(Borrador offline)]
+  PG[("PostgreSQL catálogo")]
+  AD["Adaptador de sólo lectura"]
+  WEB["Web/PWA"]
+  LOCAL[("localStorage debate")]
+  TAB["BroadcastChannel entre pestañas"]
+  PG -. "siguiente sprint" .-> AD
+  AD --> WEB
+  WEB --> LOCAL
+  WEB --> TAB
 ```
 
-### Integración de catálogo
+Hoy el adaptador usa fixtures TypeScript que corresponden al SQL de prueba. La futura conexión sustituirá sólo ese adaptador. No se crearán tablas de asistencia, oradores o votos en PostgreSQL salvo una decisión posterior explícita.
 
-No hay una ventana de sincronización. La integración ocurre en segundo plano:
+## 5. Recomendación de despliegue
 
-1. Inicio solicita la lista de comités.
-2. Al abrir uno, la consola solicita tópicos y representaciones.
-3. Se guarda un snapshot para que una modificación posterior del sitio no altere una sesión ya iniciada.
-4. El lienzo en blanco no consulta el catálogo.
+Recomiendo una **web/PWA en el subdominio `moderador.itammun.itam.mx`**, no una aplicación nativa separada.
 
-### Persistencia compartida
+Motivos:
 
-El repositorio ya define:
+- una URL funciona en laptops, tabletas y el equipo de proyección;
+- la misma base de código puede instalarse como aplicación desde navegadores compatibles;
+- las actualizaciones llegan a todas las mesas sin distribuir instaladores;
+- el subdominio aísla la consola del sitio público y permite aplicar contraseña, caché y políticas propias;
+- el Worker actual puede conectarse a un dominio personalizado con HTTPS administrado por el proveedor.
 
-- `moderator.committee_theme`: colores por comité;
-- `moderator.committee_session`: estado JSONB y número de revisión;
-- `moderator.committee_presence`: dispositivos activos durante los últimos 20 segundos;
-- API abierta de lectura/escritura por `committee_key` con control optimista de revisión.
+En esta versión no se publica nada. La configuración DNS, el secreto `MODERATOR_PASSWORD` y la conexión real se harán cuando el equipo autorice el despliegue.
 
-Antes de producción se debe decidir si el acceso abierto permitirá editar a cualquier visitante o si se limitará con un enlace secreto no indexable. Aunque no haya cuentas, un slug público como `onu-mujeres` es fácil de adivinar.
+## 6. Fases siguientes
 
-## 7. Modelo de tiempo
+1. Validación con organizadoras: textos, estados, quórum, apelaciones y orden de votación.
+2. Conectar el catálogo PostgreSQL real mediante un endpoint de sólo lectura.
+3. Cronómetros resistentes a suspensión de pestaña y pantalla compartida de tiempo.
+4. Historial con hora, correcciones y exportación.
+5. Prueba de salón con proyector, laptop/tableta y red limitada.
 
-- Entrada: `MM:SS` o `HH:MM:SS`; también se acepta un número como segundos.
-- Tecla Enter: confirma y normaliza el valor.
-- El reloj guarda duración total y tiempo restante en segundos enteros.
-- Pausar/reanudar usa una referencia temporal monotónica en la versión de producción para evitar deriva.
-- Los cronómetros normales permiten editar, reiniciar, iniciar y pausar.
-- La regla `−1 s` sólo calcula el máximo recomendado de una extensión de caucus.
+## 7. Preguntas para la siguiente revisión
 
-## 8. Fases actualizadas
+Estas preguntas no bloquearon el prototipo:
 
-### Fase 0 — segundo borrador funcional, en curso
+1. ¿El reglamento ITAMMUN confirma que una apelación se resuelve sin debate y por mayoría simple de presentes y votando?
+2. ¿La llamada nominal debe seguir el orden del catálogo, orden alfabético o comenzar por un país elegido al azar?
+3. ¿Además del país/persona que vota, la pantalla debe proyectar el sentido del voto inmediatamente o reservarlo hasta el resultado?
+4. ¿La bitácora debe permitir correcciones visibles o ser inmutable?
+5. ¿Qué vista o consulta del PostgreSQL existente se autorizará para leer el catálogo?
 
-- Inicio abierto con diez comités y lienzo en blanco.
-- Colores actuales por comité.
-- Consola compartible, selector obligatorio de tópico y oradores libres.
-- Pase de lista desplegable por color.
-- Captura de tiempo por teclado.
-- Extensión de caucus con regla de un segundo menos.
-- Esquema y API PostgreSQL para varias personas.
+## 8. Criterios de aceptación cumplidos
 
-### Fase 1 — conexión a infraestructura ITAMMUN
-
-- Ejecutar migración en un esquema PostgreSQL de desarrollo.
-- Confirmar tablas/vistas reales del sitio y sustituir el catálogo estático por endpoint interno.
-- Configurar proxy `/api/moderator` bajo el subdominio.
-- Probar dos navegadores en dispositivos distintos sobre el mismo comité.
-
-### Fase 2 — reglas de sesión
-
-- Validar estados de asistencia, quórum y mayorías.
-- Implementar mociones y flujo completo de caucus.
-- Cronómetros resistentes a suspensión de pestaña y pérdida de red.
-
-### Fase 3 — votación, pantalla pública y bitácora
-
-- Votación agregada o nominal según decisión.
-- Pantalla de proyector.
-- Registro inmutable, estadísticas y exportación.
-
-### Fase 4 — piloto
-
-- PWA instalable y cola offline.
-- Pruebas con laptop, tableta, proyector y Wi‑Fi limitado.
-- Simulacro con dos comités y capacitación de mesas.
-
-## 9. Criterios de aceptación del siguiente sprint
-
-- Cualquier persona abre inicio sin autenticación.
-- Los diez comités coinciden con la API pública y muestran su color correcto.
-- Un lienzo en blanco abre una URL única.
-- Dos dispositivos que abren la misma URL ven la misma lista de oradores al conectar la API PostgreSQL.
-- Se puede agregar un orador del catálogo o escribir uno libre.
-- Pase de lista no se habilita antes de escoger tópico.
-- Cada representación usa un desplegable legible con color y texto.
-- No existe `−1 s` en oradores, votación ni cronómetros activos.
-- La extensión propone exactamente un segundo menos y rechaza un tiempo igual o mayor.
-- Todos los tiempos configurables pueden capturarse sin mouse.
-
-## 10. Despliegue
-
-Se mantiene la recomendación de una **PWA institucional en `moderador.itammun.itam.mx`** con API y PostgreSQL del lado servidor.
-
-Ventajas:
-
-- enlace único y fácil de compartir;
-- varias mesas trabajan sin instalar software;
-- una sola versión para todos;
-- apariencia institucional;
-- aislamiento respecto del sitio público;
-- posibilidad de operación offline después del primer acceso.
-
-No se recomienda una app nativa durante el MVP.
-
-## 11. Preguntas abiertas para esta revisión
-
-1. Sin cuentas, ¿cualquier persona con `moderador.itammun.itam.mx/comite/onu-mujeres` puede **editar**, o prefieren que el enlace de edición tenga un código secreto y que el enlace corto sea sólo lectura?
-2. ¿El lienzo en blanco debe permitir agregar una lista completa de representaciones, o basta con escribir oradores libres?
-3. ¿Cuáles son los estados exactos de asistencia que utiliza ITAMMUN? El borrador propone: sin registrar, presente, presente y votando, ausente y observador.
-4. ¿Los observadores cuentan para quórum, mociones y mayoría en todos los comités o depende del tipo de comité?
-5. ¿El caucus moderado necesita dos tiempos —total y por orador— o ITAMMUN usa solamente tiempo total?
-6. ¿“Apelaciones” es un módulo distinto de extensiones de caucus en su protocolo? Si sí, ¿qué decisiones pueden apelarse y qué mayoría requieren?
-7. ¿La votación final será conteo agregado o voto nominal por representación?
-8. ¿Qué datos debe mostrar el proyector durante y después de una votación?
-9. ¿Pueden compartir el protocolo oficial de ITAMMUN para reemplazar reglas provisionales por las definitivas?
-10. ¿TI de ITAM proporcionará un esquema PostgreSQL de desarrollo y un endpoint interno, o debemos preparar un servicio separado con acceso de sólo lectura al catálogo?
-
+- Inicio abierto, diez comités y lienzo en blanco.
+- Setup previo con tópico y participantes.
+- Países, banderas, observadores y colores de prueba.
+- Oradores libres y pase de lista desplegable con texto/color.
+- Tiempo por teclado en todos los campos configurables.
+- `−1 segundo` sólo en extensión de caucus.
+- Apelaciones y votación nominal con pantalla de proyector.
+- Estado exclusivamente local y contraseña opcional para publicación.
+- Compilación, lint y pruebas automáticas exitosas.
