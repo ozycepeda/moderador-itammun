@@ -25,39 +25,39 @@ function normalizeSessionState(value: unknown, fallback: SessionState): SessionS
 
 export function useLocalCommitteeState(sessionKey: string, initialState: SessionState) {
   const [state, setState] = useState(initialState);
-  const hydrated = useRef(false);
+  const [hydrated, setHydrated] = useState(false);
   const initialStateRef = useRef(initialState);
+  const channelRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
-    async function hydrate() {
-      const storedSession = window.localStorage.getItem(sessionStorageKey(sessionKey));
-      if (storedSession) {
-        try { setState(normalizeSessionState(JSON.parse(storedSession), initialStateRef.current)); } catch { /* ignore invalid local data */ }
-      } else {
-        const rawSetup = window.localStorage.getItem(setupStorageKey(sessionKey));
-        if (rawSetup) {
-          try {
-            const setup = JSON.parse(rawSetup) as StoredSetup;
-            setState({ ...createInitialState(setup.participants), topic: setup.topic });
-          } catch { /* keep the empty initial state */ }
-        }
+    const storedSession = window.localStorage.getItem(sessionStorageKey(sessionKey));
+    if (storedSession) {
+      try { setState(normalizeSessionState(JSON.parse(storedSession), initialStateRef.current)); } catch { /* ignore invalid local data */ }
+    } else {
+      const rawSetup = window.localStorage.getItem(setupStorageKey(sessionKey));
+      if (rawSetup) {
+        try {
+          const setup = JSON.parse(rawSetup) as StoredSetup;
+          setState({ ...createInitialState(setup.participants), topic: setup.topic });
+        } catch { /* keep the empty initial state */ }
       }
-      hydrated.current = true;
     }
-    void hydrate();
+    setHydrated(true);
 
     const channel = new BroadcastChannel(`itammun:${sessionKey}`);
+    channelRef.current = channel;
     channel.onmessage = (event) => setState(normalizeSessionState(event.data, initialStateRef.current));
-    return () => channel.close();
+    return () => {
+      channel.close();
+      channelRef.current = null;
+    };
   }, [sessionKey]);
 
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydrated) return;
     window.localStorage.setItem(sessionStorageKey(sessionKey), JSON.stringify(state));
-    const channel = new BroadcastChannel(`itammun:${sessionKey}`);
-    channel.postMessage(state);
-    channel.close();
-  }, [sessionKey, state]);
+    channelRef.current?.postMessage(state);
+  }, [hydrated, sessionKey, state]);
 
   const update = useCallback((recipe: (current: SessionState) => SessionState) => {
     setState((current) => recipe(current));

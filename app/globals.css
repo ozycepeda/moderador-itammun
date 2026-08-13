@@ -100,6 +100,7 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .speaker-form input, .topic-strip input { min-height: 44px; padding: 0 .8rem; border: 1px solid var(--line); background: white; }
 .speaker-queue { margin: 0; padding: 0; list-style: none; }
 .speaker-queue li { min-height: 54px; display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: .7rem; border-top: 1px solid var(--line); }
+.speaker-queue li.empty-state { display: block; }
 .speaker-queue li > span { color: var(--committee-color); font-family: var(--font-playfair), serif; }
 .speaker-queue li button { border: 0; background: transparent; color: var(--muted); font-size: .7rem; }
 .empty-state { padding: 1.2rem 0; color: var(--muted); font-size: .83rem; }
