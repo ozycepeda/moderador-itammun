@@ -8,15 +8,31 @@ export function sessionStorageKey(sessionKey: string) {
   return `itammun:session:${sessionKey}`;
 }
 
+function normalizeSessionState(value: unknown, fallback: SessionState): SessionState {
+  if (!value || typeof value !== "object") return fallback;
+  const stored = value as Partial<SessionState>;
+  return {
+    ...fallback,
+    ...stored,
+    participants: stored.participants ?? fallback.participants,
+    attendance: stored.attendance ?? fallback.attendance,
+    speakers: stored.speakers ?? fallback.speakers,
+    appeals: stored.appeals ?? fallback.appeals,
+    events: stored.events ?? fallback.events,
+    vote: { ...fallback.vote, ...stored.vote },
+  };
+}
+
 export function useLocalCommitteeState(sessionKey: string, initialState: SessionState) {
   const [state, setState] = useState(initialState);
   const hydrated = useRef(false);
+  const initialStateRef = useRef(initialState);
 
   useEffect(() => {
     async function hydrate() {
       const storedSession = window.localStorage.getItem(sessionStorageKey(sessionKey));
       if (storedSession) {
-        try { setState(JSON.parse(storedSession)); } catch { /* ignore invalid local data */ }
+        try { setState(normalizeSessionState(JSON.parse(storedSession), initialStateRef.current)); } catch { /* ignore invalid local data */ }
       } else {
         const rawSetup = window.localStorage.getItem(setupStorageKey(sessionKey));
         if (rawSetup) {
@@ -31,7 +47,7 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
     void hydrate();
 
     const channel = new BroadcastChannel(`itammun:${sessionKey}`);
-    channel.onmessage = (event) => setState(event.data as SessionState);
+    channel.onmessage = (event) => setState(normalizeSessionState(event.data, initialStateRef.current));
     return () => channel.close();
   }, [sessionKey]);
 

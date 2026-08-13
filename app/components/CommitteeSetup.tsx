@@ -46,7 +46,8 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
     ];
     const setup: StoredSetup = { topic: finalTopic, participants, createdAt: new Date().toISOString() };
     window.localStorage.setItem(setupStorageKey(sessionKey), JSON.stringify(setup));
-    window.location.assign(`/comite/${sessionKey}`);
+    window.localStorage.removeItem(`itammun:session:${sessionKey}`);
+    window.location.assign(`/comite/${sessionKey}?nombre=${encodeURIComponent(committee.name)}`);
   }
 
   const cssVars = { "--committee-color": committee.color, "--committee-dark": committee.darkColor } as React.CSSProperties;
