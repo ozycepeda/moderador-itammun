@@ -5,6 +5,7 @@ import handler from "vinext/server/app-router-entry";
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
+  MODERATOR_PASSWORD?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -27,6 +28,16 @@ interface ExecutionContext {
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    if (env.MODERATOR_PASSWORD && !hasValidPassword(request, env.MODERATOR_PASSWORD)) {
+      return new Response("Se requiere la contraseña de Moderador ITAMMUN.", {
+        status: 401,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "www-authenticate": 'Basic realm="Moderador ITAMMUN", charset="UTF-8"',
+          "cache-control": "no-store",
+        },
+      });
+    }
     const url = new URL(request.url);
 
     if (url.pathname === "/_vinext/image") {
@@ -43,5 +54,17 @@ const worker = {
     return handler.fetch(request, env, ctx);
   },
 };
+
+function hasValidPassword(request: Request, expectedPassword: string): boolean {
+  const authorization = request.headers.get("authorization");
+  if (!authorization?.startsWith("Basic ")) return false;
+  try {
+    const decoded = atob(authorization.slice(6));
+    const separator = decoded.indexOf(":");
+    return separator >= 0 && decoded.slice(separator + 1) === expectedPassword;
+  } catch {
+    return false;
+  }
+}
 
 export default worker;

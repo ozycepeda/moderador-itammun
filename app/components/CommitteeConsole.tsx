@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Committee } from "../lib/committees";
 import type { CommitteeDetail } from "../lib/itammun-api";
-import { useSharedCommitteeState } from "../hooks/useSharedCommitteeState";
+import { useLocalCommitteeState } from "../hooks/useLocalCommitteeState";
 import { createInitialState, type AttendanceStatus, type ConsoleTab } from "../lib/session-state";
 import { formatTime, TimeInput } from "./TimeInput";
 
@@ -30,7 +30,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
   detail: CommitteeDetail;
   sessionKey: string;
 }) {
-  const { state, update, status, activeClients } = useSharedCommitteeState(sessionKey, createInitialState(detail.representations));
+  const { state, update } = useLocalCommitteeState(sessionKey, createInitialState([]));
   const [activeTab, setActiveTab] = useState<ConsoleTab>("speakers");
   const [speakerDraft, setSpeakerDraft] = useState("");
   const [customTopic, setCustomTopic] = useState("");
@@ -55,8 +55,8 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
     const values = Object.values(state.attendance);
     const present = values.filter((value) => value === "present" || value === "present-voting" || value === "observer").length;
     const voting = values.filter((value) => value === "present" || value === "present-voting").length;
-    return { present, voting, quorum: voting > 0 && voting >= Math.floor(detail.representations.filter((item) => !item.observer).length / 2) + 1 };
-  }, [detail.representations, state.attendance]);
+    return { present, voting, quorum: voting > 0 && voting >= Math.floor(state.participants.filter((item) => !item.observer).length / 2) + 1 };
+  }, [state.attendance, state.participants]);
 
   function addSpeaker() {
     const name = speakerDraft.trim();
@@ -97,9 +97,8 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
           <h1>{committee.abbreviation}</h1>
         </div>
         <div className="sharing-tools">
-          <span className={`sync-state sync-${status}`}>
-            {status === "shared" ? `${activeClients ?? 1} conectado${activeClients === 1 ? "" : "s"}` : status === "local" ? "Borrador local" : "Conectando…"}
-          </span>
+          <span className="sync-state sync-local">Guardado local</span>
+          <a className="secondary-button" href={`/comite/${sessionKey}/setup`}>Editar setup</a>
           <button className="secondary-button" onClick={share}>{copied ? "Enlace copiado" : "Compartir enlace"}</button>
         </div>
       </header>
@@ -147,7 +146,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
               <div className="panel-heading"><div><span className="section-kicker">Lista general</span><h2>Próximos oradores</h2></div><span>{state.speakers.length}</span></div>
               <form className="speaker-form" onSubmit={(event) => { event.preventDefault(); addSpeaker(); }}>
                 <input list="representation-list" value={speakerDraft} onChange={(event) => setSpeakerDraft(event.target.value)} placeholder="País, representación o nombre libre" />
-                <datalist id="representation-list">{detail.representations.map((item) => <option key={item.id} value={item.name} />)}</datalist>
+                <datalist id="representation-list">{state.participants.map((item) => <option key={item.id} value={item.name} />)}</datalist>
                 <button className="primary-button">Agregar</button>
               </form>
               <ol className="speaker-queue">
@@ -162,14 +161,14 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
 
         {activeTab === "rollcall" && (
           <section className="module-panel">
-            <div className="module-title-row"><div><span className="section-kicker">Sesión actual</span><h2>Pase de lista</h2></div><div className={`quorum-pill ${attendance.quorum ? "has-quorum" : ""}`}>{attendance.present}/{detail.representations.length} · {attendance.quorum ? "Hay quórum" : "Sin quórum"}</div></div>
+            <div className="module-title-row"><div><span className="section-kicker">Sesión actual</span><h2>Pase de lista</h2></div><div className={`quorum-pill ${attendance.quorum ? "has-quorum" : ""}`}>{attendance.present}/{state.participants.length} · {attendance.quorum ? "Hay quórum" : "Sin quórum"}</div></div>
             <div className="attendance-summary"><span>Presentes <strong>{attendance.present}</strong></span><span>Con voto <strong>{attendance.voting}</strong></span><span>Mayoría simple <strong>{Math.floor(attendance.voting / 2) + 1}</strong></span><span>Calificada <strong>{Math.ceil(attendance.voting * 2 / 3)}</strong></span></div>
             <div className="attendance-list">
-              {detail.representations.map((representation) => {
+              {state.participants.map((representation) => {
                 const value = state.attendance[representation.id] || "pending";
                 return <label className="attendance-row" key={representation.id}><span>{representation.name}</span><select className={`attendance-select status-${value}`} value={value} onChange={(event) => update((current) => ({ ...current, attendance: { ...current.attendance, [representation.id]: event.target.value as AttendanceStatus } }))}>{attendanceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
               })}
-              {detail.representations.length === 0 && <p className="empty-state">Este lienzo no tiene representaciones. Puedes trabajar con nombres libres desde Oradores.</p>}
+              {state.participants.length === 0 && <p className="empty-state">Este lienzo no tiene participantes. Regresa a Setup para agregar personas.</p>}
             </div>
           </section>
         )}

@@ -9,7 +9,7 @@ export function CommitteePicker({ committees }: { committees: Committee[] }) {
   function openBlankCanvas() {
     const name = customName.trim() || "Comité sin nombre";
     const key = `lienzo-${crypto.randomUUID()}`;
-    window.location.assign(`/comite/${key}?nombre=${encodeURIComponent(name)}`);
+    window.location.assign(`/comite/${key}/setup?nombre=${encodeURIComponent(name)}`);
   }
 
   return (
@@ -32,7 +32,7 @@ export function CommitteePicker({ committees }: { committees: Committee[] }) {
         {committees.map((committee, index) => (
           <a
             className="committee-card"
-            href={`/comite/${committee.slug}`}
+            href={`/comite/${committee.slug}/setup`}
             key={committee.id}
             style={{ "--committee-color": committee.color, "--committee-dark": committee.darkColor } as React.CSSProperties}
           >
@@ -43,7 +43,7 @@ export function CommitteePicker({ committees }: { committees: Committee[] }) {
             <div className="committee-meta">
               <span>{committee.language}</span><span>{committee.level}</span><span>{committee.representationsCount} lugares</span>
             </div>
-            <span className="card-action">Abrir consola <span aria-hidden>↗</span></span>
+            <span className="card-action">Preparar debate <span aria-hidden>↗</span></span>
           </a>
         ))}
 
@@ -53,7 +53,7 @@ export function CommitteePicker({ committees }: { committees: Committee[] }) {
           <h2>Otro comité</h2>
           <label htmlFor="custom-name">Nombre del comité</label>
           <input id="custom-name" value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="Ej. Asamblea General" />
-          <button onClick={openBlankCanvas}>Crear y abrir consola <span aria-hidden>↗</span></button>
+          <button onClick={openBlankCanvas}>Preparar lienzo <span aria-hidden>↗</span></button>
         </article>
       </section>
 

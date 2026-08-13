@@ -35,5 +35,5 @@ test("links every official committee to a shareable route", async () => {
     "onu-mujeres", "acnur", "unicef", "cij", "onudi", "cepa",
     "banco-mundial", "consejo-de-seguridad", "interpol", "otan",
   ];
-  for (const slug of slugs) assert.match(html, new RegExp(`href="/comite/${slug}"`));
+  for (const slug of slugs) assert.match(html, new RegExp(`href="/comite/${slug}/setup"`));
 });
