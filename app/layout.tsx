@@ -15,6 +15,14 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "Moderador · ITAMMUN",
   description: "Consola abierta para conducir los comités de ITAMMUN.",
+  applicationName: "Moderador ITAMMUN",
+  icons: { icon: "/favicon.svg", apple: "/icon-192.png" },
+  openGraph: {
+    title: "Moderador · ITAMMUN",
+    description: "Consola local para conducir comités y debates de ITAMMUN.",
+    type: "website",
+    images: [{ url: "/og.png", width: 1731, height: 909, alt: "Sala de debate de ITAMMUN" }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
