@@ -41,3 +41,6 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# Local snapshot of the production ITAMMUN database schema
+/itammun_schema.sql
