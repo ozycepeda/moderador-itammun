@@ -17,6 +17,7 @@
 - No puede haber oradores mientras no exista tópico.
 - El tópico sólo puede modificarse cuando la cola de oradores está vacía.
 - La cola podrá reordenarse arrastrando, con alternativa accesible por teclado.
+- Los oradores se seleccionan del catálogo de participantes de la sesión; no existe captura de texto libre.
 - Caucus elimina el tiempo por orador y la división en dos paneles.
 - Caucus mostrará tópico, cronómetro, controles y la extensión `−1 segundo` en una sola vista.
 - Todas las votaciones, incluidas apelaciones, incluyen únicamente países `Presente y votando`.
@@ -170,6 +171,7 @@ Implementación:
 - anuncio accesible de la nueva posición;
 - persistencia inmediata del orden;
 - nombres repetidos permitidos gracias al identificador único.
+- el alta usa un selector y rechaza cualquier valor que no corresponda a un participante de la sesión.
 
 ### 4.6 Caucus en una sola vista
 
@@ -195,9 +197,9 @@ Reglas:
 - conservar entrada de duración por teclado antes de iniciar;
 - hacer Iniciar/Pausar el botón visualmente principal;
 - integrar `−1 segundo` como botón de extensión, no como resta al reloj activo;
-- el texto del botón muestra la duración resultante para evitar ambigüedad;
 - eliminar toda explicación protocolaria de la ventana;
-- la extensión puede editarse por teclado antes de aplicarla.
+- la única extensión disponible aplica automáticamente la duración original menos un segundo;
+- los cuatro controles aparecen en una sola fila: Reiniciar, Iniciar/Pausar, Aplicar extensión −1s y Finalizar.
 
 ### 4.7 Votación nominal
 
@@ -316,3 +318,9 @@ Compatibilidad con la primera iteración:
 | Cambio de asistencia durante un voto | La fila iniciada se congela; la siguiente usa los cambios. |
 
 No quedan preguntas funcionales bloqueantes para comenzar la implementación.
+
+## 9. Viabilidad de interfaz bilingüe
+
+Una interfaz completa en español e inglés tiene viabilidad alta y dificultad media. No requiere cambiar PostgreSQL ni duplicar rutas: se recomienda un selector global `ES | EN`, un diccionario tipado de traducciones y persistencia de la preferencia en `localStorage`.
+
+El alcance debe incluir navegación, formularios, estados de asistencia, accesibilidad, mensajes vacíos, controles de tiempo, votaciones y eventos nuevos de la bitácora. Los nombres oficiales de comités, países y tópicos deben conservar el idioma entregado por el catálogo hasta que la fuente real ofrezca traducciones. Esta separación permite añadir otros idiomas sin reescribir los componentes.

@@ -7,7 +7,7 @@ Prototipo funcional para preparar y conducir debates de ITAMMUN. El catálogo de
 - Inicio sin cuentas con diez comités y lienzo en blanco.
 - Setup obligatorio para marcar los cupos ocupados; el catálogo completo permanece disponible.
 - Pase de lista siempre editable con botones de estado; después se elige o crea el tópico.
-- Lista de oradores reordenable por arrastre, botones o teclado y tiempos capturados por teclado.
+- Lista de oradores limitada a los participantes de la sesión, reordenable por arrastre, botones o teclado.
 - Caucus moderado en una sola vista con tiempo total y extensión de un segundo menos.
 - Apelaciones procesales con votación inmediata.
 - Votación nominal exclusiva para países `presente y votando` y pantalla de proyector.
