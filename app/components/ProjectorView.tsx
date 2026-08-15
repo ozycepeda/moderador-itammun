@@ -13,7 +13,6 @@ export function ProjectorView({ committee, sessionKey }: { committee: Committee;
   const counts = {
     for: ballots.filter((choice) => choice === "for").length,
     against: ballots.filter((choice) => choice === "against").length,
-    abstain: ballots.filter((choice) => choice === "abstain").length,
   };
   const cssVars = { "--committee-color": committee.color, "--committee-dark": committee.darkColor } as React.CSSProperties;
 
@@ -37,7 +36,7 @@ export function ProjectorView({ committee, sessionKey }: { committee: Committee;
           <div className="projector-result">
             <span className="projector-kicker">Votación concluida</span>
             <h1>{state.vote.label}</h1>
-            <div className="projector-counts"><div><strong>{counts.for}</strong><span>A favor</span></div><div><strong>{counts.against}</strong><span>En contra</span></div><div><strong>{counts.abstain}</strong><span>Abstenciones</span></div></div>
+            <div className="projector-counts projector-counts-two"><div><strong>{counts.for}</strong><span>A favor</span></div><div><strong>{counts.against}</strong><span>En contra</span></div></div>
           </div>
         ) : (
           <div className="projector-idle">

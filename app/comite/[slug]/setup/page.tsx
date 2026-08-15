@@ -18,5 +18,5 @@ export default async function SetupPage({ params, searchParams }: {
     language: "ES" as const, level: "Intermedio" as const, representationType: "delegacion" as const,
     representationsCount: 0, secretariat: "Lienzo en blanco", color: "#C2943D", darkColor: "#2E2812",
   };
-  return <CommitteeSetup committee={resolved} detail={getCommitteeDetail(slug, resolved.representationsCount)} sessionKey={slug} />;
+  return <CommitteeSetup committee={resolved} detail={getCommitteeDetail(slug)} sessionKey={slug} />;
 }

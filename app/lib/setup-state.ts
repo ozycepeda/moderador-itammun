@@ -1,8 +1,9 @@
 import type { Representation } from "./itammun-api";
 
 export type StoredSetup = {
-  topic: string;
+  topic?: string;
   participants: Representation[];
+  assignedParticipantIds?: string[];
   createdAt: string;
 };
 

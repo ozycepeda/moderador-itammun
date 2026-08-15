@@ -41,21 +41,28 @@ test("links every official committee to a shareable route", async () => {
 test("renders setup and projector routes", async () => {
   const setup = await render("/comite/onu-mujeres/setup");
   assert.equal(setup.status, 200);
-  assert.match(await setup.text(), /Define el tópico y quiénes participan/);
+  const setupHtml = await setup.text();
+  assert.match(setupHtml, /Marca los cupos asignados al inicio/);
+  assert.match(setupHtml, /Cupo asignado/);
+  assert.match(setupHtml, /Disponible/);
+  assert.match(setupHtml, /Santa Sede/);
+  assert.doesNotMatch(setupHtml, /Tema de la sesión/);
+
+  const consoleResponse = await render("/comite/onu-mujeres");
+  assert.equal(consoleResponse.status, 200);
+  const consoleHtml = await consoleResponse.text();
+  assert.match(consoleHtml, /Pase de lista/);
+  assert.match(consoleHtml, /Presente y votando/);
+  assert.match(consoleHtml, /Observador/);
+  assert.match(consoleHtml, /Pendiente · defínelo/);
+  assert.doesNotMatch(consoleHtml, /Tiempo por orador/);
 
   const projector = await render("/comite/onu-mujeres/pantalla");
   assert.equal(projector.status, 200);
   assert.match(await projector.text(), /Esperando el inicio del debate/);
 });
 
-test("keeps local mode public and supports an optional deployment password", async () => {
+test("keeps every deployment public", async () => {
   assert.equal((await render()).status, 200);
-
-  const unauthorized = await render("/", { env: { MODERATOR_PASSWORD: "secreto" } });
-  assert.equal(unauthorized.status, 401);
-  assert.match(unauthorized.headers.get("www-authenticate") ?? "", /^Basic /);
-
-  const authorization = `Basic ${Buffer.from("moderacion:secreto").toString("base64")}`;
-  const authorized = await render("/", { env: { MODERATOR_PASSWORD: "secreto" }, headers: { authorization } });
-  assert.equal(authorized.status, 200);
+  assert.equal((await render("/", { env: { MODERATOR_PASSWORD: "ignorada" } })).status, 200);
 });

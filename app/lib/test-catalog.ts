@@ -51,9 +51,7 @@ const topics: Record<string, string[]> = {
   otan: ["Collective security and emerging threats", "Alliance resilience and strategic cooperation"],
 };
 
-export function getTestCommitteeDetail(slug: string, count: number): CommitteeDetail {
+export function getTestCommitteeDetail(slug: string): CommitteeDetail {
   if (slug.startsWith("lienzo-")) return { topics: [], representations: [] };
-  const members = testCountries.filter((country) => !country.observer).slice(0, Math.min(count, 31));
-  const observers = count > members.length ? testCountries.filter((country) => country.observer).slice(0, count - members.length) : [];
-  return { topics: topics[slug] ?? ["Tópico A", "Tópico B"], representations: [...members, ...observers] };
+  return { topics: topics[slug] ?? ["Tópico A", "Tópico B"], representations: [...testCountries] };
 }

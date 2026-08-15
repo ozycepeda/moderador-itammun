@@ -192,6 +192,56 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .projector-counts span { color: #ffffffa0; font-size: .8rem; }
 .projector-idle p { margin-top: 2rem; color: #ffffffaa; font-size: clamp(1rem, 2vw, 1.5rem); }
 
+.session-topic-strip { min-height: 64px; display: flex; align-items: center; gap: 1rem; padding: .75rem clamp(1rem, 3vw, 3rem); background: #f3e9d0; border-bottom: 1px solid #dfcfa8; }
+.session-topic-strip.topic-ready { background: color-mix(in srgb, var(--committee-color) 9%, white); border-color: color-mix(in srgb, var(--committee-color), white 65%); }
+.session-topic-strip strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-playfair), serif; }
+.rollcall-module { display: flex; flex-direction: column; }
+.topic-editor { display: grid; grid-template-columns: minmax(250px, .75fr) minmax(400px, 1.25fr); align-items: center; gap: 1.5rem; margin: 0 0 1.5rem; padding: 1.25rem; background: color-mix(in srgb, var(--committee-color) 8%, white); border: 1px solid color-mix(in srgb, var(--committee-color), white 62%); }
+.topic-editor h3 { margin: .3rem 0 0; font-family: var(--font-playfair), serif; font-size: 1.2rem; }
+.topic-editor p { margin: .35rem 0 0; color: var(--danger); font-size: .7rem; }
+.topic-editor.is-locked { background: #f2f1ed; border-color: var(--line); }
+.topic-editor-controls { display: grid; gap: .55rem; }
+.topic-editor-controls select, .topic-editor-controls input { width: 100%; min-height: 46px; padding: 0 .8rem; border: 1px solid var(--line); background: white; color: var(--itam-ink); }
+.topic-editor-controls form { display: grid; grid-template-columns: 1fr auto; gap: .55rem; }
+.topic-editor-controls button { min-height: 46px; padding: 0 .9rem; border: 1px solid var(--committee-dark); background: var(--committee-dark); color: white; font-size: .72rem; font-weight: 800; }
+.topic-editor-controls :disabled { cursor: not-allowed; opacity: .55; }
+.attendance-row { grid-template-columns: minmax(220px, 1fr) minmax(520px, auto); padding: .65rem .5rem; }
+.attendance-person { display: grid; grid-template-columns: 34px minmax(120px, auto) 1fr; align-items: center; gap: .65rem; }
+.attendance-person img { width: 32px; height: 22px; object-fit: cover; border: 1px solid var(--line); }
+.attendance-person span { font-size: .84rem; font-weight: 700; }
+.attendance-person em { color: var(--muted); font-size: .62rem; font-style: normal; }
+.attendance-buttons { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .4rem; }
+.attendance-button, .attendance-clear { min-height: 44px; padding: 0 .72rem; border: 1px solid currentColor; border-radius: 4px; font-size: .68rem; font-weight: 800; }
+.attendance-button:not([aria-pressed="true"]) { background: white; color: var(--muted); border-color: var(--line); }
+.attendance-button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px currentColor; }
+.attendance-clear { border-color: transparent; background: transparent; color: var(--muted); }
+.attendance-clear:disabled { cursor: default; opacity: .25; }
+
+.speaker-queue li { grid-template-columns: 44px 28px 1fr auto; padding: .35rem 0; background: white; }
+.speaker-queue li.is-dragging { z-index: 3; box-shadow: 0 10px 30px #0e1b1726; opacity: .92; }
+.speaker-queue li > .queue-position { color: var(--committee-color); font-family: var(--font-playfair), serif; }
+.speaker-queue li .drag-handle { width: 42px; min-height: 42px; border: 1px solid var(--line); background: var(--paper); color: var(--itam-ink); font-size: 1.1rem; cursor: grab; touch-action: none; }
+.speaker-queue li .drag-handle:active { cursor: grabbing; }
+.queue-actions { display: flex; align-items: center; gap: .25rem; }
+.speaker-queue li .queue-actions button { min-width: 38px; min-height: 38px; padding: 0 .45rem; border: 1px solid transparent; }
+.speaker-queue li .queue-actions button:hover:not(:disabled) { border-color: var(--line); background: var(--paper); color: var(--itam-ink); }
+.speaker-queue li .queue-actions button:disabled { cursor: not-allowed; opacity: .25; }
+.queue-help { margin: -.55rem 0 1rem; color: var(--muted); font-size: .68rem; }
+
+.caucus-focus { min-height: calc(100vh - 255px); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: clamp(1.5rem, 5vw, 5rem); background: var(--committee-dark); color: white; text-align: center; border: 1px solid var(--committee-dark); }
+.caucus-focus > h2 { max-width: 950px; margin: .55rem 0 0; color: white; font-size: clamp(1.5rem, 3.2vw, 3rem); font-weight: 500; }
+.caucus-focus .section-kicker { color: color-mix(in srgb, var(--committee-color), white 35%); }
+.caucus-main-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: .7rem; margin-top: 1.5rem; }
+.caucus-main-controls button { min-width: 130px; min-height: 58px; padding: 0 1.2rem; border: 1px solid #ffffff55; background: transparent; color: white; font-size: .78rem; font-weight: 800; }
+.caucus-main-controls .caucus-primary { min-width: 200px; min-height: 68px; border-color: var(--committee-color); background: var(--committee-color); color: var(--committee-dark); font-size: .9rem; }
+.caucus-extension-controls { width: min(900px, 100%); display: grid; grid-template-columns: minmax(180px, .65fr) minmax(270px, 1fr) auto; align-items: end; gap: .7rem; margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid #ffffff2b; }
+.caucus-extension-controls .rule-button { min-height: 56px; border-color: color-mix(in srgb, var(--committee-color), white 25%); background: #ffffff0d; color: white; }
+.caucus-extension-controls .rule-button strong { color: color-mix(in srgb, var(--committee-color), white 25%); }
+.secondary-apply { min-height: 56px; padding: 0 .9rem; border: 1px solid #ffffff55; background: transparent; color: white; font-size: .7rem; font-weight: 800; }
+.inline-link { justify-self: start; padding: 0; border: 0; background: transparent; color: var(--committee-color); font-size: .75rem; font-weight: 800; text-decoration: underline; }
+.vote-counts-two, .projector-counts-two { grid-template-columns: repeat(2, minmax(150px, 240px)); }
+.setup-grid-single { display: block; max-width: 1100px; margin-inline: auto; }
+
 .setup-shell { min-height: 100vh; padding-bottom: 110px; background: var(--paper); }
 .setup-step { color: color-mix(in srgb, var(--committee-color), white 35%); font-size: .72rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
 .setup-intro { max-width: 850px; padding: clamp(2.5rem, 6vw, 5rem) clamp(1rem, 4vw, 4rem) 2rem; }
@@ -235,6 +285,10 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
   .topic-strip select, .topic-strip input { width: 100%; }
   .setup-grid { grid-template-columns: 1fr; }
   .appeal-form { grid-template-columns: 1fr; }
+  .topic-editor { grid-template-columns: 1fr; }
+  .attendance-row { grid-template-columns: 1fr; }
+  .attendance-buttons { justify-content: flex-start; }
+  .caucus-extension-controls { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {
@@ -251,6 +305,9 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
   .attendance-summary span:nth-child(2) { border-right: 0; }
   .attendance-summary span:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .attendance-row { grid-template-columns: 1fr; gap: .35rem; padding: .65rem .2rem; }
+  .attendance-person { grid-template-columns: 34px 1fr auto; }
+  .attendance-buttons { display: grid; grid-template-columns: 1fr 1fr; }
+  .attendance-button, .attendance-clear { width: 100%; }
   .module-title-row { align-items: flex-start; flex-direction: column; }
   .speaker-stage, .caucus-clock { padding-inline: 1rem; }
   .timer-display { font-size: clamp(3.6rem, 20vw, 6rem); }
@@ -266,6 +323,11 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
   .vote-counts div, .projector-counts div { border-right: 0; border-bottom: 1px solid var(--line); }
   .projector-counts div { border-bottom-color: #ffffff40; }
   .vote-counts div:last-child, .projector-counts div:last-child { border-bottom: 0; }
+  .topic-editor-controls form { grid-template-columns: 1fr; }
+  .speaker-queue li { grid-template-columns: 42px 24px 1fr; }
+  .queue-actions { grid-column: 2 / -1; justify-content: flex-end; }
+  .caucus-main-controls { width: 100%; display: grid; grid-template-columns: 1fr; }
+  .caucus-main-controls button, .caucus-main-controls .caucus-primary { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

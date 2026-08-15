@@ -15,7 +15,7 @@ export type Committee = {
 // IDs y metadatos confirmados contra la API pública vigente de ITAMMUN.
 // Los colores replican el mapa visual del bundle público actual; la API aún no
 // los entrega como campos de base de datos. La migración PostgreSQL incluida en
-// sql/001_moderator.sql los guarda como configuración del moderador.
+// sql/001_catalog_test.sql los guarda como configuración del moderador.
 export const committees: Committee[] = [
   { id: "27c2f7cf-0188-4733-b8f1-2406c4313e52", slug: "onu-mujeres", abbreviation: "ONU Mujeres", name: "ONU Mujeres", language: "ES", level: "Bajo", representationType: "delegacion", representationsCount: 25, secretariat: "Asuntos Humanitarios", color: "#3C98A5", darkColor: "#1A3A3E" },
   { id: "eb2c6702-122d-4e3f-bae5-185731081340", slug: "acnur", abbreviation: "ACNUR", name: "ACNUR", language: "ES", level: "Intermedio", representationType: "delegacion", representationsCount: 25, secretariat: "Asuntos Humanitarios", color: "#82BAB7", darkColor: "#1C3635" },

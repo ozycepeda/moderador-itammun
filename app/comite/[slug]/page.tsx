@@ -18,7 +18,7 @@ export default async function CommitteePage({
   if (!committee && !isBlank) notFound();
 
   if (committee) {
-    const detail = getCommitteeDetail(committee.slug, committee.representationsCount);
+    const detail = getCommitteeDetail(committee.slug);
     return <CommitteeConsole committee={committee} detail={detail} sessionKey={committee.slug} />;
   }
 

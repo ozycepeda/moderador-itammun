@@ -2,7 +2,12 @@ import type { Representation } from "./itammun-api";
 
 export type AttendanceStatus = "pending" | "absent" | "present" | "present-voting" | "observer";
 export type ConsoleTab = "speakers" | "rollcall" | "caucus" | "motions" | "voting" | "log";
-export type VoteChoice = "for" | "against" | "abstain";
+export type VoteChoice = "for" | "against";
+
+export type SpeakerQueueItem = {
+  id: string;
+  name: string;
+};
 
 export type Appeal = {
   id: string;
@@ -22,14 +27,15 @@ export type VoteState = {
 };
 
 export type SessionState = {
+  schemaVersion: 2;
   topic: string;
   participants: Representation[];
-  speakers: string[];
+  assignedParticipantIds: string[];
+  speakers: SpeakerQueueItem[];
   currentSpeaker: string;
   speakerTime: number;
   attendance: Record<string, AttendanceStatus>;
   caucusDuration: number;
-  caucusSpeakerTime: number;
   caucusExtension: number;
   appeals: Appeal[];
   vote: VoteState;
@@ -38,8 +44,10 @@ export type SessionState = {
 
 export function createInitialState(representations: Representation[]): SessionState {
   return {
+    schemaVersion: 2,
     topic: "",
     participants: representations,
+    assignedParticipantIds: representations.map((representation) => representation.id),
     speakers: [],
     currentSpeaker: "",
     speakerTime: 60,
@@ -48,7 +56,6 @@ export function createInitialState(representations: Representation[]): SessionSt
       representation.observer ? "observer" : "pending",
     ])),
     caucusDuration: 600,
-    caucusSpeakerTime: 45,
     caucusExtension: 599,
     appeals: [],
     vote: { label: "", context: "substantive", queue: [], currentIndex: 0, ballots: {}, status: "idle" },

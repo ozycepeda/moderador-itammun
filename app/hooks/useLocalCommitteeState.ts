@@ -1,26 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { normalizeSessionState } from "../lib/session-migration";
 import { createInitialState, type SessionState } from "../lib/session-state";
 import { setupStorageKey, type StoredSetup } from "../lib/setup-state";
 
 export function sessionStorageKey(sessionKey: string) {
   return `itammun:session:${sessionKey}`;
-}
-
-function normalizeSessionState(value: unknown, fallback: SessionState): SessionState {
-  if (!value || typeof value !== "object") return fallback;
-  const stored = value as Partial<SessionState>;
-  return {
-    ...fallback,
-    ...stored,
-    participants: stored.participants ?? fallback.participants,
-    attendance: stored.attendance ?? fallback.attendance,
-    speakers: stored.speakers ?? fallback.speakers,
-    appeals: stored.appeals ?? fallback.appeals,
-    events: stored.events ?? fallback.events,
-    vote: { ...fallback.vote, ...stored.vote },
-  };
 }
 
 export function useLocalCommitteeState(sessionKey: string, initialState: SessionState) {
@@ -38,7 +24,12 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
       if (rawSetup) {
         try {
           const setup = JSON.parse(rawSetup) as StoredSetup;
-          setState({ ...createInitialState(setup.participants), topic: setup.topic });
+          const setupState = createInitialState(setup.participants);
+          setState({
+            ...setupState,
+            topic: setup.topic ?? "",
+            assignedParticipantIds: setup.assignedParticipantIds ?? setup.participants.map((participant) => participant.id),
+          });
         } catch { /* keep the empty initial state */ }
       }
     }

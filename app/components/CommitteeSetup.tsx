@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import type { Committee } from "../lib/committees";
 import type { CommitteeDetail, Representation } from "../lib/itammun-api";
 import { setupStorageKey, type StoredSetup } from "../lib/setup-state";
@@ -12,16 +12,14 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
   detail: CommitteeDetail;
   sessionKey: string;
 }) {
-  const [topic, setTopic] = useState("");
-  const [customTopic, setCustomTopic] = useState("");
-  const [selected, setSelected] = useState(() => new Set(detail.representations.map((item) => item.id)));
+  const [selected, setSelected] = useState(() => new Set(detail.representations.slice(0, committee.representationsCount).map((item) => item.id)));
   const [customParticipants, setCustomParticipants] = useState<Representation[]>([]);
   const [customName, setCustomName] = useState("");
   const [search, setSearch] = useState("");
 
   const visible = useMemo(() => detail.representations.filter((item) => item.name.toLocaleLowerCase("es").includes(search.toLocaleLowerCase("es"))), [detail.representations, search]);
-  const finalTopic = topic === "__custom" ? customTopic.trim() : topic;
-  const participantCount = selected.size + customParticipants.length;
+  const participants = [...detail.representations, ...customParticipants];
+  const assignedParticipantIds = [...selected, ...customParticipants.map((participant) => participant.id)];
 
   function toggle(id: string) {
     setSelected((current) => {
@@ -38,13 +36,9 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
     setCustomName("");
   }
 
-  function startDebate() {
-    if (!finalTopic || participantCount === 0) return;
-    const participants = [
-      ...detail.representations.filter((item) => selected.has(item.id)),
-      ...customParticipants,
-    ];
-    const setup: StoredSetup = { topic: finalTopic, participants, createdAt: new Date().toISOString() };
+  function startSession() {
+    if (participants.length === 0) return;
+    const setup: StoredSetup = { participants, assignedParticipantIds, createdAt: new Date().toISOString() };
     window.localStorage.setItem(setupStorageKey(sessionKey), JSON.stringify(setup));
     window.localStorage.removeItem(`itammun:session:${sessionKey}`);
     window.location.assign(`/comite/${sessionKey}?nombre=${encodeURIComponent(committee.name)}`);
@@ -57,43 +51,24 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
       <header className="console-header">
         <Link href="/" className="console-brand"><span className="brand-mark">I</span><span>ITAMMUN</span></Link>
         <div className="committee-heading"><span>{committee.secretariat}</span><h1>{committee.abbreviation}</h1></div>
-        <span className="setup-step">Setup del debate</span>
+        <span className="setup-step">Preparar sesión</span>
       </header>
 
       <section className="setup-intro">
         <p className="eyebrow">Preparación local</p>
-        <h2>Define el tópico y quiénes participan</h2>
-        <p>Esta selección crea el debate en este dispositivo. No escribe asistencia, oradores ni votos en la base de catálogo.</p>
+        <h2>Marca los cupos asignados al inicio</h2>
+        <p>Todos los países permanecerán disponibles en el pase de lista. Esta selección sólo identifica los cupos ocupados al comenzar.</p>
       </section>
 
-      <div className="setup-grid">
-        <section className="setup-panel topic-panel">
-          <span className="section-kicker">01 · Tópico</span>
-          <h2>Tema de la sesión</h2>
-          {detail.topics.length > 0 && (
-            <label>Seleccionar del catálogo
-              <select value={topic} onChange={(event) => setTopic(event.target.value)}>
-                <option value="">Seleccionar tópico…</option>
-                {detail.topics.map((item) => <option value={item} key={item}>{item}</option>)}
-                <option value="__custom">Escribir otro tópico</option>
-              </select>
-            </label>
-          )}
-          {(detail.topics.length === 0 || topic === "__custom") && (
-            <label>Nombre del tópico
-              <input value={customTopic} onChange={(event) => setCustomTopic(event.target.value)} placeholder="Escribe el tema a debatir" />
-            </label>
-          )}
-        </section>
-
+      <div className="setup-grid setup-grid-single">
         <section className="setup-panel participants-panel">
-          <div className="setup-panel-heading"><div><span className="section-kicker">02 · Participantes</span><h2>Países y personas</h2></div><strong>{participantCount}</strong></div>
+          <div className="setup-panel-heading"><div><span className="section-kicker">Países y personas</span><h2>Cupos iniciales</h2></div><strong>{assignedParticipantIds.length}</strong></div>
           {detail.representations.length > 0 && (
             <>
               <div className="catalog-tools">
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en el catálogo" />
-                <button onClick={() => setSelected(new Set(detail.representations.map((item) => item.id)))}>Seleccionar todos</button>
-                <button onClick={() => setSelected(new Set())}>Quitar todos</button>
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en el catálogo" aria-label="Buscar en el catálogo" />
+                <button onClick={() => setSelected(new Set(detail.representations.map((item) => item.id)))}>Marcar todos</button>
+                <button onClick={() => setSelected(new Set())}>Quitar marcas</button>
               </div>
               <div className="setup-country-list">
                 {visible.map((item) => (
@@ -101,7 +76,7 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
                     <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggle(item.id)} />
                     {item.flagUrl ? <Image src={item.flagUrl} alt="" width={28} height={19} unoptimized /> : <span className="flag-placeholder" />}
                     <span>{item.name}</span>
-                    {item.observer && <em>Observador</em>}
+                    <em>{selected.has(item.id) ? "Cupo asignado" : "Disponible"}</em>
                   </label>
                 ))}
               </div>
@@ -109,16 +84,16 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
           )}
 
           <form className="custom-participant-form" onSubmit={(event) => { event.preventDefault(); addCustomParticipant(); }}>
-            <label htmlFor="custom-participant">Agregar país o persona manualmente</label>
+            <label htmlFor="custom-participant">Agregar país o persona adicional</label>
             <div><input id="custom-participant" value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="Nombre libre" /><button>Agregar</button></div>
           </form>
-          {customParticipants.length > 0 && <ul className="custom-participants">{customParticipants.map((item) => <li key={item.id}><span>{item.name}</span><button onClick={() => setCustomParticipants((current) => current.filter((entry) => entry.id !== item.id))}>Quitar</button></li>)}</ul>}
+          {customParticipants.length > 0 && <ul className="custom-participants">{customParticipants.map((item) => <li key={item.id}><span>{item.name} · Cupo asignado</span><button onClick={() => setCustomParticipants((current) => current.filter((entry) => entry.id !== item.id))}>Quitar</button></li>)}</ul>}
         </section>
       </div>
 
       <footer className="setup-footer">
-        <div><strong>{finalTopic || "Falta definir el tópico"}</strong><span>{participantCount} participantes seleccionados</span></div>
-        <button className="primary-button" disabled={!finalTopic || participantCount === 0} onClick={startDebate}>Iniciar debate</button>
+        <div><strong>{assignedParticipantIds.length} cupos iniciales</strong><span>{participants.length} países y personas disponibles en la sesión</span></div>
+        <button className="primary-button" disabled={participants.length === 0} onClick={startSession}>Iniciar sesión</button>
       </footer>
     </main>
   );
