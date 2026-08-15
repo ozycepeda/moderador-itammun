@@ -1,6 +1,6 @@
 # Plan de implementación — segunda iteración
 
-**Estado:** decisiones de diseño confirmadas; todavía no implementadas
+**Estado:** implementación completada; lint, build y pruebas automatizadas aprobadas
 
 **Fecha:** 15 de agosto de 2026
 

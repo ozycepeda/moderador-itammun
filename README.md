@@ -5,13 +5,14 @@ Prototipo funcional para preparar y conducir debates de ITAMMUN. El catálogo de
 ## Funcionalidad
 
 - Inicio sin cuentas con diez comités y lienzo en blanco.
-- Setup obligatorio: tópico y participantes antes de iniciar el debate.
-- Lista de oradores libre, pase de lista con estados por texto y color y tiempos por teclado.
-- Caucus moderado con tiempo total, tiempo por orador y extensión de un segundo menos.
+- Setup obligatorio para marcar los cupos ocupados; el catálogo completo permanece disponible.
+- Pase de lista siempre editable con botones de estado; después se elige o crea el tópico.
+- Lista de oradores reordenable por arrastre, botones o teclado y tiempos capturados por teclado.
+- Caucus moderado en una sola vista con tiempo total y extensión de un segundo menos.
 - Apelaciones procesales con votación inmediata.
-- Votación nominal y pantalla de proyector con el país/persona que emite su voto.
+- Votación nominal exclusiva para países `presente y votando` y pantalla de proyector.
 - Sincronización entre pestañas del mismo navegador mediante `BroadcastChannel`.
-- Acceso público por defecto y contraseña HTTP opcional al publicar.
+- Acceso público, sin cuentas ni contraseña.
 - Manifiesto PWA: la web puede instalarse desde un navegador compatible.
 
 ## Desarrollo local
@@ -50,16 +51,6 @@ La aplicación todavía usa el adaptador local de [`app/lib/test-catalog.ts`](ap
 - Reiniciar el setup del mismo comité reemplaza el debate local anterior.
 - Abrir la misma URL en otro dispositivo no comparte votos, asistencia ni oradores.
 - `Compartir` copia el enlace de setup del comité para que otra persona cree su propia sesión local.
-
-## Contraseña de publicación
-
-Si `MODERATOR_PASSWORD` no existe, el sitio es público. Si se define, el Worker exige autenticación HTTP Basic para todo el subdominio. En producción debe configurarse como secreto del proveedor, nunca en el repositorio.
-
-```bash
-npx wrangler secret put MODERATOR_PASSWORD
-```
-
-No se implementaron usuarios, roles ni recuperación de contraseña.
 
 ## Documentación
 

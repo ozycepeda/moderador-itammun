@@ -4,28 +4,16 @@
 
 La primera versión usa votación **nominal**. Cada miembro elegible aparece por turno, la Mesa registra su voto y la pantalla pública muestra el país o persona actual.
 
-La configuración central está en `app/lib/voting-config.ts`:
+La regla está representada directamente por el tipo `VoteChoice` y por el filtro de elegibilidad de la consola. La cola se congela al iniciar cada votación para que un cambio posterior de asistencia no altere una votación en curso.
 
-```ts
-export const votingConfig = {
-  mode: "nominal",
-  allowAbstentions: true,
-  presentAndVotingCanAbstain: false,
-  observersCanVote: false,
-  projectorShowsCurrentVoter: true,
-  appealRule: "simple-present-and-voting",
-};
-```
-
-Para cambiar a captura agregada en el futuro, se puede sustituir la interfaz de llamada individual por tres totales (`for`, `against`, `abstain`). Conviene conservar el modelo `ballots` para apelaciones o votaciones que necesiten trazabilidad nominal.
+Para cambiar a captura agregada en el futuro, se puede sustituir la interfaz de llamada individual por dos totales (`for`, `against`). Conviene conservar el modelo `ballots` para apelaciones o votaciones que necesiten trazabilidad nominal.
 
 ## Elegibilidad
 
-- `presente`: puede votar y abstenerse;
-- `presente y votando`: puede votar, pero no abstenerse;
-- `observador`, `ausente` o `sin registrar`: no entra a la fila.
+- `presente y votando`: entra a la fila nominal y elige a favor o en contra;
+- `presente`, `observador`, `ausente` o `sin registrar`: no entra a la fila.
 
-Los observadores tampoco cuentan para quórum o mayorías.
+No se ofrece abstención. Los observadores tampoco cuentan para quórum o mayorías.
 
 ## Apelación a una decisión de la Mesa
 
@@ -36,7 +24,7 @@ Implementación:
 1. Se registra quién apela y qué decisión cuestiona.
 2. Se abre inmediatamente la pregunta `¿Se revoca la decisión de la Mesa?`.
 3. Se llama nominalmente a los miembros elegibles.
-4. Abstenciones no se suman a ningún lado.
+4. Cada país vota a favor o en contra; no hay abstenciones.
 5. Si `a favor > en contra`, la decisión queda revocada; en cualquier otro caso se mantiene.
 
 Referencias:
