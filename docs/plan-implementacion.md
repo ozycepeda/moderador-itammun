@@ -319,8 +319,8 @@ Compatibilidad con la primera iteración:
 
 No quedan preguntas funcionales bloqueantes para comenzar la implementación.
 
-## 9. Viabilidad de interfaz bilingüe
+## 9. Interfaz bilingüe implementada
 
-Una interfaz completa en español e inglés tiene viabilidad alta y dificultad media. No requiere cambiar PostgreSQL ni duplicar rutas: se recomienda un selector global `ES | EN`, un diccionario tipado de traducciones y persistencia de la preferencia en `localStorage`.
+La interfaz completa en español e inglés usa un selector global `ES | EN`, un diccionario tipado de traducciones y persistencia en `localStorage[itammun:language]`. No cambia PostgreSQL, no duplica rutas ni modifica las sesiones guardadas.
 
-El alcance debe incluir navegación, formularios, estados de asistencia, accesibilidad, mensajes vacíos, controles de tiempo, votaciones y eventos nuevos de la bitácora. Los nombres oficiales de comités, países y tópicos deben conservar el idioma entregado por el catálogo hasta que la fuente real ofrezca traducciones. Esta separación permite añadir otros idiomas sin reescribir los componentes.
+El cambio cubre navegación, formularios, estados de asistencia, accesibilidad, mensajes vacíos, controles de tiempo, votaciones, proyector y eventos nuevos de la bitácora. Los nombres oficiales de comités, países y tópicos conservan el idioma entregado por el catálogo hasta que la fuente real ofrezca traducciones. Esta separación permite añadir otros idiomas sin reescribir los componentes.

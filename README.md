@@ -5,6 +5,7 @@ Prototipo funcional para preparar y conducir debates de ITAMMUN. El catálogo de
 ## Funcionalidad
 
 - Inicio sin cuentas con diez comités y lienzo en blanco.
+- Interfaz completa en español e inglés con preferencia persistente entre páginas y pestañas.
 - Setup obligatorio para marcar los cupos ocupados; el catálogo completo permanece disponible.
 - Pase de lista siempre editable con botones de estado; después se elige o crea el tópico.
 - Lista de oradores limitada a los participantes de la sesión, reordenable por arrastre, botones o teclado.
@@ -48,6 +49,7 @@ La aplicación todavía usa el adaptador local de [`app/lib/test-catalog.ts`](ap
 
 - Setup: `localStorage[itammun:setup:<slug>]`.
 - Debate: `localStorage[itammun:session:<slug>]`.
+- Idioma: `localStorage[itammun:language]` (`es` o `en`).
 - Reiniciar el setup del mismo comité reemplaza el debate local anterior.
 - Abrir la misma URL en otro dispositivo no comparte votos, asistencia ni oradores.
 - `Compartir` copia el enlace de setup del comité para que otra persona cree su propia sesión local.
