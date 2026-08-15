@@ -1,235 +1,318 @@
-# Plan de implementación — Moderador ITAMMUN
+# Plan de implementación — segunda iteración
 
-**Estado:** primera versión local implementada
+**Estado:** decisiones de diseño confirmadas; todavía no implementadas
 
-**Fecha:** 12 de agosto de 2026
+**Fecha:** 15 de agosto de 2026
 
-**Objetivo:** validar el flujo de moderación con las organizadoras antes de conectar el catálogo real.
+**Objetivo:** adaptar la consola al orden real de una sesión y reducir pasos para la Mesa.
 
-## 1. Decisiones incorporadas
+## 1. Decisiones confirmadas
 
-- Sin cuentas. En local, cualquier persona con la URL puede entrar.
-- Al publicar se puede definir una única contraseña para todo el subdominio.
-- PostgreSQL será únicamente la fuente del catálogo: comités, colores, tópicos, países y banderas.
-- El estado operativo del debate no se escribe en PostgreSQL; vive en el navegador.
-- Inicio permite elegir un comité o crear un lienzo en blanco.
-- Después de elegir se abre `Setup`: primero se define tópico y participantes; después se pasa a la consola.
-- El lienzo en blanco admite participantes escritos libremente.
-- Observadores aparecen en sala, pero no cuentan para quórum, mayorías ni votación.
-- Todos los tiempos se escriben con teclado en `MM:SS` o `HH:MM:SS`.
-- La regla `−1 segundo` sólo aparece al preparar una extensión de caucus.
-- Caucus moderado guarda duración total y tiempo por orador.
-- Las apelaciones viven en Mociones y abren una votación inmediata, no debatible.
-- La votación es nominal por defecto y la pantalla pública muestra quién está votando.
+- La aplicación será pública. No habrá contraseña, login ni campo de acceso.
+- Setup no pedirá tópico; servirá para indicar qué países tienen cupo asignado inicialmente.
+- Todos los países del catálogo del comité permanecerán disponibles en la consola, incluso si no tenían cupo al iniciar.
+- El pase de lista será una pestaña siempre abierta y editable; no existe `Cerrar pase de lista`.
+- Cada país tendrá botones para `Presente`, `Presente y votando`, `Ausente` y `Observador`.
+- El tópico se selecciona o crea dentro de la consola después de comenzar el pase de lista.
+- No puede haber oradores mientras no exista tópico.
+- El tópico sólo puede modificarse cuando la cola de oradores está vacía.
+- La cola podrá reordenarse arrastrando, con alternativa accesible por teclado.
+- Caucus elimina el tiempo por orador y la división en dos paneles.
+- Caucus mostrará tópico, cronómetro, controles y la extensión `−1 segundo` en una sola vista.
+- Todas las votaciones, incluidas apelaciones, incluyen únicamente países `Presente y votando`.
+- No se conservará asistencia entre sesiones: al iniciar otra sesión se vuelve a pasar lista.
 
-## 2. Flujo implementado
+## 2. Viabilidad
+
+| Cambio | Viabilidad | Impacto | Nota técnica |
+|---|---|---:|---|
+| Acceso completamente público | Alta | Bajo | Se retira la protección opcional del servidor y su configuración. |
+| Países disponibles aunque no tengan cupo | Alta | Medio | Setup guardará asignaciones iniciales sin recortar el catálogo del comité. |
+| Pase de lista siempre editable mediante botones | Alta | Medio | Sustituye desplegables; no requiere etapas ni cierre de asistencia. |
+| Tópico posterior al inicio de asistencia | Alta | Medio | El tópico vacío bloquea módulos de debate, pero no Pase de lista. |
+| Tópico editable sólo con cola vacía | Alta | Bajo | Se deriva directamente del estado de la cola. |
+| Cola arrastrable | Alta | Medio | Requiere identificadores únicos y migración del estado local. |
+| Caucus en una sola vista | Alta | Medio | Simplifica estado y diseño; no usa fullscreen del navegador. |
+| Sólo vota `Presente y votando` | Alta | Bajo | Se cambia el filtro y se elimina abstención. |
+
+Todos los cambios son compatibles con el estado local actual y no requieren guardar el debate en PostgreSQL.
+
+## 3. Flujo revisado
 
 ```mermaid
 flowchart LR
-  A["Inicio público"] --> B{"Comité o lienzo"}
-  B -->|"Comité"| C["Setup con catálogo"]
-  B -->|"Lienzo"| D["Setup vacío"]
-  C --> E["Definir tópico"]
-  D --> E
-  E --> F["Elegir o agregar participantes"]
-  F --> G["Crear debate local"]
-  G --> H["Consola"]
-  H --> I["Oradores"]
-  H --> J["Pase de lista"]
-  H --> K["Caucus"]
-  H --> L["Mociones y apelaciones"]
-  H --> M["Votación nominal"]
-  M --> N["Pantalla de proyector"]
-  H --> O["Bitácora"]
+  A["Inicio público"] --> B["Seleccionar comité"]
+  B --> C["Marcar cupos asignados"]
+  C --> D["Iniciar sesión local"]
+  D --> E["Pase de lista editable"]
+  E --> F["Seleccionar o crear tópico"]
+  F --> G["Habilitar Oradores y debate"]
+  G --> H["Cola reordenable"]
+  G --> I["Caucus"]
+  G --> J["Mociones y apelaciones"]
+  G --> K["Votación nominal"]
+  G --> L["Bitácora"]
+  E -->|"Llegadas o correcciones"| E
 ```
 
-No existe una pantalla de sincronización. La carga del catálogo ocurre al entrar a inicio/setup. La sesión resultante es local y se sincroniza únicamente entre pestañas del mismo navegador.
+No se necesita una propiedad `phase` ni un botón para finalizar asistencia. La regla de navegación es sencilla:
 
-## 3. Borradores de ventanas
+- Pase de lista siempre está disponible;
+- sin tópico, los demás módulos están bloqueados;
+- con tópico, se habilita el debate;
+- si la cola contiene oradores, el tópico queda bloqueado;
+- cuando la cola vuelve a estar vacía, el tópico puede modificarse.
 
-### V01 — Inicio
+## 4. Ventanas y comportamiento
+
+### 4.1 Inicio público
+
+La pantalla conserva los comités y el lienzo en blanco. `Acceso abierto` es sólo informativo.
+
+**Cambios:**
+
+- eliminar `MODERATOR_PASSWORD` del Worker, variables de entorno y documentación;
+- no mostrar modal, formulario ni aviso de contraseña;
+- mantener el acceso por enlace directo al comité.
+
+### 4.2 Setup de cupos
+
+Setup muestra todo el catálogo del comité. Marcar un país significa que tiene cupo/delegación asignada al comenzar, no que será eliminado o añadido al catálogo.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ ITAMMUN · Moderador                          Acceso abierto  │
+│ ONU Mujeres                              Preparar sesión    │
+├──────────────────────────────────────────────────────────────┤
+│ CUPOS ASIGNADOS AL INICIO                              18  │
+│ [Buscar_______________________________________________]     │
+│ ☑ 🇲🇽 México       ☑ 🇫🇷 Francia       ☐ 🇯🇵 Japón           │
+│ ☑ 🇧🇷 Brasil       ☐ 🇨🇦 Canadá        ☐ 🇮🇳 India           │
 │                                                              │
-│ ¿Qué comité vas a moderar?                                   │
-│ [ONU Mujeres] [ACNUR] [UNICEF] [ICJ]                         │
-│ [UNIDO] [CEPA] [Banco Mundial]                               │
-│ [Consejo de Seguridad] [INTERPOL] [NATO]                     │
+│ País/persona adicional [____________________] [Agregar]     │
+├──────────────────────────────────────────────────────────────┤
+│ 18 cupos iniciales                         [Iniciar sesión] │
+└──────────────────────────────────────────────────────────────┘
+```
+
+Al crear la sesión se guardan dos elementos distintos:
+
+- `participants`: catálogo completo más altas manuales;
+- `assignedParticipantIds`: países con cupo asignado inicialmente.
+
+Todos aparecen después en Pase de lista. Los asignados pueden mostrarse primero; los no asignados permanecen visibles debajo y pueden recibir cualquier estado si hay un cambio de último momento.
+
+Iniciar una sesión nueva reinicia asistencia a `Sin registrar`; no se crea un historial de sesiones ni se reutiliza el pase anterior.
+
+### 4.3 Pase de lista permanente
+
+La consola abre en esta pestaña. No hay botón de cierre.
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│ PASE DE LISTA                    18 en sala · 12 con voto             │
+│                                                                        │
+│ México   [Presente] [Presente y votando] [Ausente] [Observador]       │
+│ Francia  [Presente] [Presente y votando] [Ausente] [Observador]       │
+│ Japón    [Presente] [Presente y votando] [Ausente] [Observador]       │
+│                                                                        │
+│ TÓPICO DE LA SESIÓN                                                   │
+│ [Seleccionar tópico… ▼]  o  [Escribir tópico________________]        │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+Reglas de interacción:
+
+- cada botón tiene texto, color y `aria-pressed`;
+- área mínima de toque de 44 × 44 px;
+- `Sin registrar` es el estado inicial y existe una acción `Limpiar` para volver a él;
+- `Observador` es una opción igual que las demás, no un atributo bloqueado del país;
+- los cambios pueden realizarse en cualquier momento;
+- llegadas tardías y correcciones actualizan inmediatamente quórum y número habilitado para votar;
+- países sin cupo inicial permanecen en la lista y pueden marcarse si se ocupan después.
+
+### 4.4 Tópico y bloqueo de módulos
+
+El selector de tópico vive dentro de la consola, asociado a Pase de lista. Puede usarse después de comenzar la asistencia sin cerrar esa pestaña.
+
+```text
+Sin tópico:
+  Pase de lista ✓ | Oradores 🔒 | Caucus 🔒 | Mociones 🔒 | Votación 🔒
+
+Con tópico:
+  Pase de lista ✓ | Oradores ✓  | Caucus ✓  | Mociones ✓  | Votación ✓
+```
+
+Reglas:
+
+- seleccionar o crear tópico habilita los módulos de debate;
+- con una cola de oradores vacía, el selector permanece editable;
+- al agregar el primer orador, el selector se bloquea y muestra `Vacía la cola para cambiar el tópico`;
+- al retirar o terminar todos los elementos de la cola, vuelve a habilitarse;
+- cada cambio de tópico se registra en Bitácora.
+
+### 4.5 Cola de oradores reordenable
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ PRÓXIMOS ORADORES                                            │
+│ ⠿ 1  México                   [↑] [↓] [Quitar]              │
+│ ⠿ 2  Francia                  [↑] [↓] [Quitar]              │
+│ ⠿ 3  Japón                    [↑] [↓] [Quitar]              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+Implementación:
+
+- migrar `speakers: string[]` a `{ id, name }[]`;
+- asa de arrastre compatible con mouse y touch;
+- teclado para tomar, mover y soltar un elemento;
+- botones `Subir` y `Bajar` como alternativa directa;
+- anuncio accesible de la nueva posición;
+- persistencia inmediata del orden;
+- nombres repetidos permitidos gracias al identificador único.
+
+### 4.6 Caucus en una sola vista
+
+No se solicitará fullscreen del navegador. La pestaña conserva el encabezado general, pero su contenido será una sola superficie centrada, sin panel de descripción ni tiempo por orador.
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ CAUCUS · TÓPICO                                              │
+│ Reducción de la brecha de género en asistencia humanitaria │
 │                                                              │
-│ [Lienzo en blanco · nombre opcional____________] [Crear]    │
+│                          09:42                               │
+│                                                              │
+│               [Reiniciar] [PAUSAR] [Finalizar]              │
+│                                                              │
+│             [Extender por 09:59 · −1 segundo]               │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Cada comité conserva los colores tomados del sitio ITAMMUN. Seleccionar una tarjeta abre su setup, no la consola directamente.
+Reglas:
 
-### V02 — Setup
+- eliminar `Tiempo por orador` y `caucusSpeakerTime`;
+- mostrar el tópico encima del reloj;
+- conservar entrada de duración por teclado antes de iniciar;
+- hacer Iniciar/Pausar el botón visualmente principal;
+- integrar `−1 segundo` como botón de extensión, no como resta al reloj activo;
+- el texto del botón muestra la duración resultante para evitar ambigüedad;
+- eliminar toda explicación protocolaria de la ventana;
+- la extensión puede editarse por teclado antes de aplicarla.
+
+### 4.7 Votación nominal
+
+Todas las votaciones usan únicamente participantes cuyo estado actual sea `Presente y votando`, incluidas las apelaciones.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ ONU Mujeres                                  Setup debate   │
-├───────────────────────┬──────────────────────────────────────┤
-│ 01 · TÓPICO           │ 02 · PARTICIPANTES             33  │
-│ [Tópico A        ▼]   │ [Buscar___________________________] │
-│ o [Escribir tópico]   │ ☑ 🇲🇽 México                        │
-│                       │ ☑ 🇫🇷 Francia                        │
-│                       │ ☑ Estado de Palestina · Observador │
-│                       │ [Nombre libre__________] [Agregar]  │
-├───────────────────────┴──────────────────────────────────────┤
-│ Tópico A · 33 participantes               [Iniciar debate] │
+│ VOTACIÓN NOMINAL · 1 DE 12                                  │
+│                         🇲🇽                                   │
+│                        México                                │
+│                                                              │
+│                  [A favor]  [En contra]                      │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Crear setup del mismo comité reemplaza la sesión local anterior. No modifica el catálogo.
+Consecuencias:
 
-### V03 — Consola / oradores
+- `Presente`, `Ausente`, `Observador` y `Sin registrar` no entran en la fila;
+- se elimina Abstención;
+- antes de iniciar se muestra el número de países habilitados;
+- si no hay ninguno, se enlaza directamente a Pase de lista para corregir;
+- la fila se congela al iniciar una votación, aunque después cambie asistencia;
+- una votación posterior usa la asistencia actualizada.
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ ONU Mujeres · Guardado local  [Setup] [Pantalla] [Compartir]│
-│ TÓPICO: Tópico A                                            │
-├─────────────────────────────┬────────────────────────────────┤
-│ ORADOR ACTUAL               │ PRÓXIMOS                      │
-│ México                      │ 1. Francia                    │
-│          00:43              │ 2. Nombre libre               │
-│ Tiempo [01:00]              │ [país/persona_______][Agregar]│
-│ [Reiniciar] [Pausar] [Sig.]│                                │
-└─────────────────────────────┴────────────────────────────────┘
-```
-
-El campo acepta catálogo o texto libre. `Compartir` copia el enlace de setup; no promete colaboración entre dispositivos.
-
-### V04 — Pase de lista
+## 5. Cambios de modelo y migración
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│ 18/33 en sala · 16 con voto · Hay quórum                   │
-│ México                  [● Presente                 ▼]      │
-│ Francia                 [● Presente y votando       ▼]      │
-│ Alemania                [● Ausente                  ▼]      │
-│ Santa Sede              [● Observador               ▼]      │
-└──────────────────────────────────────────────────────────────┘
+StoredSetup
+  participants: catálogo completo
+  assignedParticipantIds: cupos iniciales
+
+SessionState
+  topic: string
+  participants: catálogo completo
+  assignedParticipantIds: string[]
+  speakers: { id, name }[]
+  attendance: Record<id, estado>
+  caucusSpeakerTime: eliminado
 ```
 
-Estados: gris `sin registrar`, verde `presente`, dorado `presente y votando`, rojo `ausente`, azul `observador`. El texto siempre acompaña al color.
+Compatibilidad con la primera iteración:
 
-### V05 — Caucus y extensiones
+- los participantes ya guardados se consideran asignados;
+- al abrir un comité conocido, se vuelven a incorporar países faltantes del catálogo;
+- las colas de texto se convierten a elementos con UUID;
+- se ignora `caucusSpeakerTime` antiguo;
+- un tópico previo se conserva;
+- iniciar Setup otra vez crea una sesión nueva y reinicia asistencia.
 
-```text
-┌─────────────────────────────┬────────────────────────────────┐
-│ CAUCUS MODERADO             │ EXTENSIÓN                     │
-│          08:22              │ La extensión debe ser menor  │
-│ Total [10:00]               │ Tiempo [09:59]                │
-│ Por orador [00:45]          │ [Regla −1 segundo · 09:59]   │
-│ [Reiniciar] [Pausar]        │ [Aplicar extensión]           │
-└─────────────────────────────┴────────────────────────────────┘
-```
+## 6. Orden de implementación
 
-Cambiar el total recalcula la propuesta a un segundo menos. El campo nunca acepta una extensión igual o mayor.
+### Fase A — Modelo local
 
-### V06 — Mociones / apelaciones
+1. Separar catálogo completo de cupos asignados.
+2. Migrar la cola a objetos con identificador.
+3. Retirar `caucusSpeakerTime`.
+4. Actualizar el normalizador de sesiones antiguas.
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ APELACIONES A LA MESA                  Mayoría simple       │
-│ País/persona [México____]  Decisión [Descripción_________] │
-│                                      [Registrar apelación] │
-│ México · decisión procesal       [Abrir votación inmediata]│
-└──────────────────────────────────────────────────────────────┘
-```
+### Fase B — Inicio, asistencia y tópico
 
-La pregunta se formula como “¿Se revoca la decisión de la Mesa?”. Sólo se revoca si `a favor > en contra`; empate conserva la decisión.
+1. Retirar protección por contraseña.
+2. Cambiar Setup para guardar cupos sin eliminar países.
+3. Abrir consola en Pase de lista.
+4. Sustituir desplegables por cuatro botones accesibles.
+5. Mover tópico a Pase de lista y bloquear otros módulos hasta definirlo.
+6. Bloquear edición de tópico mientras la cola no esté vacía.
 
-### V07 — Votación nominal
+### Fase C — Debate
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ VOTACIÓN NOMINAL                         Voto 4 de 16       │
-│                         🇲🇽                                  │
-│                    Emite su voto                            │
-│                        México                               │
-│ [A favor]          [En contra]          [Abstención]       │
-└──────────────────────────────────────────────────────────────┘
-```
+1. Implementar reordenamiento de cola por drag-and-drop.
+2. Añadir controles equivalentes por teclado y botones.
+3. Rediseñar Caucus como una sola superficie.
+4. Integrar tópico y extensión `−1 segundo`.
 
-La fila se forma con miembros `presente` o `presente y votando`. Los segundos no pueden abstenerse. El resultado muestra votos a favor, en contra y abstenciones.
+### Fase D — Votación
 
-### V08 — Pantalla de proyector
+1. Filtrar exclusivamente `Presente y votando` en votaciones y apelaciones.
+2. Retirar Abstención.
+3. Actualizar pantalla de proyector, resultados y bitácora.
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ ITAMMUN                                      ONU Mujeres    │
-│                    Voto 4 de 16                             │
-│                         🇲🇽                                  │
-│                    Emite su voto                            │
-│                        México                               │
-└──────────────────────────────────────────────────────────────┘
-```
+### Fase E — Validación
 
-Es de sólo lectura. Al concluir muestra totales; fuera de votación muestra tópico y orador actual.
+1. Probar una sesión con países asignados y no asignados.
+2. Simular una llegada tardía y una corrección de asistencia.
+3. Probar bloqueo y desbloqueo del tópico al modificar la cola.
+4. Probar reordenamiento con mouse, touch y teclado.
+5. Verificar Caucus en laptop y proyector.
+6. Confirmar que todas las votaciones excluyen cualquier estado distinto de `Presente y votando`.
+7. Probar migración desde una sesión creada con la primera iteración.
 
-### V09 — Bitácora
+## 7. Criterios de aceptación
 
-Registra localmente alta y turno de oradores, extensiones, inicio de votación y resultado de apelaciones. Exportación y marcas de hora quedan para el siguiente sprint.
+- La aplicación es pública y no contiene flujo de contraseña.
+- Setup no muestra tópico y no elimina países del catálogo.
+- Todos los países aparecen en Pase de lista, tengan o no cupo inicial.
+- Pase de lista permanece abierto y editable durante toda la sesión.
+- Cada fila ofrece `Presente`, `Presente y votando`, `Ausente` y `Observador` como botones.
+- Oradores y demás módulos están bloqueados hasta definir tópico.
+- El tópico sólo se modifica con la cola vacía.
+- La cola se reordena arrastrando y también sin mouse.
+- Caucus es una sola vista, muestra tópico y no tiene tiempo por orador ni descripción.
+- `−1 segundo` está integrado como extensión dentro de Caucus.
+- Sólo `Presente y votando` participa en cualquier votación.
+- Una sesión nueva reinicia completamente la asistencia.
 
-## 4. Arquitectura actual y futura
+## 8. Riesgos resueltos
 
-```mermaid
-flowchart TB
-  PG[("PostgreSQL catálogo")]
-  AD["Adaptador de sólo lectura"]
-  WEB["Web/PWA"]
-  LOCAL[("localStorage debate")]
-  TAB["BroadcastChannel entre pestañas"]
-  PG -. "siguiente sprint" .-> AD
-  AD --> WEB
-  WEB --> LOCAL
-  WEB --> TAB
-```
+| Riesgo | Decisión |
+|---|---|
+| Llegadas tardías o errores de asistencia | Pase de lista nunca se cierra. |
+| País sin cupo necesario a último minuto | Todo el catálogo permanece visible. |
+| Oradores sin tema definido | Módulos bloqueados hasta seleccionar tópico. |
+| Cambio de tema con turnos pendientes | Selector bloqueado mientras la cola tenga elementos. |
+| Drag-and-drop inaccesible | Teclado y botones Subir/Bajar equivalentes. |
+| Confusión sobre `−1 segundo` | Botón rotulado como extensión y con duración resultante. |
+| Cambio de asistencia durante un voto | La fila iniciada se congela; la siguiente usa los cambios. |
 
-Hoy el adaptador usa fixtures TypeScript que corresponden al SQL de prueba. La futura conexión sustituirá sólo ese adaptador. No se crearán tablas de asistencia, oradores o votos en PostgreSQL salvo una decisión posterior explícita.
-
-## 5. Recomendación de despliegue
-
-Recomiendo una **web/PWA en el subdominio `moderador.itammun.itam.mx`**, no una aplicación nativa separada.
-
-Motivos:
-
-- una URL funciona en laptops, tabletas y el equipo de proyección;
-- la misma base de código puede instalarse como aplicación desde navegadores compatibles;
-- las actualizaciones llegan a todas las mesas sin distribuir instaladores;
-- el subdominio aísla la consola del sitio público y permite aplicar contraseña, caché y políticas propias;
-- el Worker actual puede conectarse a un dominio personalizado con HTTPS administrado por el proveedor.
-
-En esta versión no se publica nada. La configuración DNS, el secreto `MODERATOR_PASSWORD` y la conexión real se harán cuando el equipo autorice el despliegue.
-
-## 6. Fases siguientes
-
-1. Validación con organizadoras: textos, estados, quórum, apelaciones y orden de votación.
-2. Conectar el catálogo PostgreSQL real mediante un endpoint de sólo lectura.
-3. Cronómetros resistentes a suspensión de pestaña y pantalla compartida de tiempo.
-4. Historial con hora, correcciones y exportación.
-5. Prueba de salón con proyector, laptop/tableta y red limitada.
-
-## 7. Preguntas para la siguiente revisión
-
-Estas preguntas no bloquearon el prototipo:
-
-1. ¿El reglamento ITAMMUN confirma que una apelación se resuelve sin debate y por mayoría simple de presentes y votando?
-2. ¿La llamada nominal debe seguir el orden del catálogo, orden alfabético o comenzar por un país elegido al azar?
-3. ¿Además del país/persona que vota, la pantalla debe proyectar el sentido del voto inmediatamente o reservarlo hasta el resultado?
-4. ¿La bitácora debe permitir correcciones visibles o ser inmutable?
-5. ¿Qué vista o consulta del PostgreSQL existente se autorizará para leer el catálogo?
-
-## 8. Criterios de aceptación cumplidos
-
-- Inicio abierto, diez comités y lienzo en blanco.
-- Setup previo con tópico y participantes.
-- Países, banderas, observadores y colores de prueba.
-- Oradores libres y pase de lista desplegable con texto/color.
-- Tiempo por teclado en todos los campos configurables.
-- `−1 segundo` sólo en extensión de caucus.
-- Apelaciones y votación nominal con pantalla de proyector.
-- Estado exclusivamente local y contraseña opcional para publicación.
-- Compilación, lint y pruebas automáticas exitosas.
+No quedan preguntas funcionales bloqueantes para comenzar la implementación.
