@@ -43,8 +43,7 @@ test("renders setup and projector routes", async () => {
   assert.equal(setup.status, 200);
   const setupHtml = await setup.text();
   assert.match(setupHtml, /Marca los cupos asignados al inicio/);
-  assert.match(setupHtml, /Cupo asignado/);
-  assert.match(setupHtml, /Disponible/);
+  assert.doesNotMatch(setupHtml, /Cupo asignado|Disponible/);
   assert.match(setupHtml, /Santa Sede/);
   assert.doesNotMatch(setupHtml, /Tema de la sesión/);
 

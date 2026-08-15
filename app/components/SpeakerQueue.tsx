@@ -71,7 +71,7 @@ export function SpeakerQueue({ items, onChange }: {
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}>
       <SortableContext items={items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
         <ol className="speaker-queue">
-          {items.length === 0 && <li className="empty-state">La lista está vacía. Agrega cualquier orador.</li>}
+          {items.length === 0 && <li className="empty-state">La lista está vacía. Selecciona un país o representación.</li>}
           {items.map((item, index) => (
             <SortableSpeaker
               key={item.id}

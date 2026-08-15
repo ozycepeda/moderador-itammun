@@ -33,7 +33,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
 }) {
   const { state, update } = useLocalCommitteeState(sessionKey, createInitialState(detail.representations));
   const [activeTab, setActiveTab] = useState<ConsoleTab>("rollcall");
-  const [speakerDraft, setSpeakerDraft] = useState("");
+  const [speakerParticipantId, setSpeakerParticipantId] = useState("");
   const [topicDraft, setTopicDraft] = useState("");
   const [customTopicMode, setCustomTopicMode] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -100,14 +100,14 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
   }
 
   function addSpeaker() {
-    const name = speakerDraft.trim();
-    if (!name || !state.topic) return;
+    const participant = state.participants.find((item) => item.id === speakerParticipantId);
+    if (!participant || !state.topic) return;
     update((current) => ({
       ...current,
-      speakers: [...current.speakers, { id: crypto.randomUUID(), name }],
-      events: [`${name} se agregó a la lista`, ...current.events],
+      speakers: [...current.speakers, { id: crypto.randomUUID(), name: participant.name }],
+      events: [`${participant.name} se agregó a la lista`, ...current.events],
     }));
-    setSpeakerDraft("");
+    setSpeakerParticipantId("");
   }
 
   function nextSpeaker() {
@@ -214,11 +214,23 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
               <div><span className="section-kicker">Tópico de la sesión</span><h3>{state.topic || "Selecciona o crea el tópico"}</h3>{topicLocked && <p>Vacía la cola de oradores para cambiar el tópico.</p>}</div>
               <div className="topic-editor-controls">
                 {detail.topics.length > 0 && <select aria-label="Tópico de la sesión" disabled={topicLocked} value={topicSelectValue} onChange={(event) => {
-                  if (event.target.value === "__custom") { setTopicDraft(""); setCustomTopicMode(true); return; }
+                  if (event.target.value === "__custom") {
+                    setTopicDraft(state.topic && !knownTopic ? state.topic : "");
+                    setCustomTopicMode(true);
+                    return;
+                  }
                   setCustomTopicMode(false);
+                  setTopicDraft("");
                   updateTopic(event.target.value);
                 }}><option value="">Seleccionar tópico…</option>{detail.topics.map((topic) => <option key={topic} value={topic}>{topic}</option>)}<option value="__custom">Escribir otro tópico</option></select>}
-                {(detail.topics.length === 0 || customTopicMode || (state.topic && !knownTopic)) && <form onSubmit={(event) => { event.preventDefault(); if (topicDraft.trim() && !topicLocked) { updateTopic(topicDraft.trim()); setCustomTopicMode(false); } }}><input key={`${state.topic}-${customTopicMode}`} disabled={topicLocked} defaultValue={customTopicMode ? "" : state.topic} onChange={(event) => setTopicDraft(event.target.value)} placeholder="Escribe el tópico" aria-label="Nuevo tópico" /><button disabled={topicLocked || !topicDraft.trim()}>Definir tópico</button></form>}
+                {(detail.topics.length === 0 || customTopicMode || (state.topic && !knownTopic)) && <form onSubmit={(event) => {
+                  event.preventDefault();
+                  const topic = topicDraft.trim();
+                  if (!topic || topicLocked) return;
+                  updateTopic(topic);
+                  setTopicDraft(topic);
+                  setCustomTopicMode(false);
+                }}><input disabled={topicLocked} value={topicDraft} onChange={(event) => setTopicDraft(event.target.value)} placeholder="Escribe el tópico" aria-label="Nuevo tópico" /><button type="submit" disabled={topicLocked || !topicDraft.trim()}>Definir tópico</button></form>}
               </div>
             </section>
 
@@ -242,8 +254,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
             </div>
             <div className="queue-panel">
               <div className="panel-heading"><div><span className="section-kicker">Lista general</span><h2>Próximos oradores</h2></div><span>{state.speakers.length}</span></div>
-              <form className="speaker-form" onSubmit={(event) => { event.preventDefault(); addSpeaker(); }}><input list="representation-list" value={speakerDraft} onChange={(event) => setSpeakerDraft(event.target.value)} placeholder="País, representación o nombre libre" /><datalist id="representation-list">{state.participants.map((item) => <option key={item.id} value={item.name} />)}</datalist><button className="primary-button">Agregar</button></form>
-              <p className="queue-help">Arrastra desde ⠿ o usa las flechas para modificar el orden.</p>
+              <form className="speaker-form" onSubmit={(event) => { event.preventDefault(); addSpeaker(); }}><select aria-label="Seleccionar próximo orador" value={speakerParticipantId} onChange={(event) => setSpeakerParticipantId(event.target.value)}><option value="">Seleccionar país o representación…</option>{state.participants.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="primary-button" disabled={!speakerParticipantId}>Agregar</button></form>
               <SpeakerQueue items={state.speakers} onChange={(speakers, event) => update((current) => ({ ...current, speakers, events: [event, ...current.events] }))} />
             </div>
           </section>
@@ -254,8 +265,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
             <span className="section-kicker">Caucus · tópico</span><h2>{state.topic}</h2>
             <div className="timer-display">{formatTime(caucusRemaining)}</div>
             <TimeInput label="Duración total" seconds={state.caucusDuration} onChange={(seconds) => { setCaucusRemaining(seconds); update((current) => ({ ...current, caucusDuration: seconds, caucusExtension: Math.max(0, seconds - 1) })); }} compact />
-            <div className="caucus-main-controls"><button onClick={() => { setCaucusRemaining(state.caucusDuration); setCaucusRunning(false); }}>Reiniciar</button><button className="caucus-primary" onClick={() => setCaucusRunning((value) => !value)}>{caucusRunning ? "Pausar" : "Iniciar caucus"}</button><button onClick={() => { setCaucusRemaining(0); setCaucusRunning(false); }}>Finalizar</button></div>
-            <div className="caucus-extension-controls"><TimeInput label="Extensión" seconds={state.caucusExtension} onChange={(seconds) => update((current) => ({ ...current, caucusExtension: Math.min(seconds, Math.max(0, current.caucusDuration - 1)) }))} compact /><button className="rule-button" onClick={() => { const extension = Math.max(0, state.caucusDuration - 1); setCaucusRemaining(extension); setCaucusRunning(false); update((current) => ({ ...current, caucusExtension: extension, events: [`Extensión de caucus · ${formatTime(extension)}`, ...current.events] })); }}><span>Extender por {formatTime(Math.max(0, state.caucusDuration - 1))}</span><strong>−1 segundo</strong></button><button className="secondary-apply" onClick={() => { setCaucusRemaining(state.caucusExtension); setCaucusRunning(false); update((current) => ({ ...current, events: [`Extensión de caucus · ${formatTime(current.caucusExtension)}`, ...current.events] })); }}>Aplicar extensión escrita</button></div>
+            <div className="caucus-main-controls"><button onClick={() => { setCaucusRemaining(state.caucusDuration); setCaucusRunning(false); }}>Reiniciar</button><button className="caucus-primary" onClick={() => setCaucusRunning((value) => !value)}>{caucusRunning ? "Pausar" : "Iniciar caucus"}</button><button className="caucus-extension-button" onClick={() => { const extension = Math.max(0, state.caucusDuration - 1); setCaucusRemaining(extension); setCaucusRunning(false); update((current) => ({ ...current, caucusExtension: extension, events: [`Extensión de caucus · ${formatTime(extension)}`, ...current.events] })); }}>Aplicar extensión −1s</button><button onClick={() => { setCaucusRemaining(0); setCaucusRunning(false); }}>Finalizar</button></div>
           </section>
         )}
 

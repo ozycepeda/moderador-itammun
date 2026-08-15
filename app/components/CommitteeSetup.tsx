@@ -76,7 +76,6 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
                     <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggle(item.id)} />
                     {item.flagUrl ? <Image src={item.flagUrl} alt="" width={28} height={19} unoptimized /> : <span className="flag-placeholder" />}
                     <span>{item.name}</span>
-                    <em>{selected.has(item.id) ? "Cupo asignado" : "Disponible"}</em>
                   </label>
                 ))}
               </div>
@@ -87,7 +86,7 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
             <label htmlFor="custom-participant">Agregar país o persona adicional</label>
             <div><input id="custom-participant" value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="Nombre libre" /><button>Agregar</button></div>
           </form>
-          {customParticipants.length > 0 && <ul className="custom-participants">{customParticipants.map((item) => <li key={item.id}><span>{item.name} · Cupo asignado</span><button onClick={() => setCustomParticipants((current) => current.filter((entry) => entry.id !== item.id))}>Quitar</button></li>)}</ul>}
+          {customParticipants.length > 0 && <ul className="custom-participants">{customParticipants.map((item) => <li key={item.id}><span>{item.name}</span><button onClick={() => setCustomParticipants((current) => current.filter((entry) => entry.id !== item.id))}>Quitar</button></li>)}</ul>}
         </section>
       </div>
 
