@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { useLanguage } from "./LanguageProvider";
 
 export function parseTime(value: string) {
   const clean = value.trim();
@@ -29,6 +30,7 @@ export function TimeInput({ label, seconds, onChange, compact = false }: {
   compact?: boolean;
 }) {
   const id = useId();
+  const { t } = useLanguage();
   return (
     <label className={`time-field ${compact ? "time-field-compact" : ""}`} htmlFor={id}>
       <span>{label}</span>
@@ -45,7 +47,7 @@ export function TimeInput({ label, seconds, onChange, compact = false }: {
         pattern="[0-9:]*"
         spellCheck={false}
       />
-      <small id={`${id}-hint`}>Escribe MM:SS y presiona Enter</small>
+      <small id={`${id}-hint`}>{t("timeHint")}</small>
     </label>
   );
 }

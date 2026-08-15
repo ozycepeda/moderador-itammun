@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import type { Committee } from "../lib/committees";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { useLanguage } from "./LanguageProvider";
 
 export function CommitteePicker({ committees }: { committees: Committee[] }) {
   const [customName, setCustomName] = useState("");
+  const { t } = useLanguage();
 
   function openBlankCanvas() {
-    const name = customName.trim() || "Comité sin nombre";
+    const name = customName.trim() || t("unnamedCommittee");
     const key = `lienzo-${crypto.randomUUID()}`;
     window.location.assign(`/comite/${key}/setup?nombre=${encodeURIComponent(name)}`);
   }
@@ -17,18 +20,18 @@ export function CommitteePicker({ committees }: { committees: Committee[] }) {
       <header className="landing-header">
         <div className="brand-lockup">
           <span className="brand-mark">I</span>
-          <div><strong>ITAMMUN</strong><span>Moderador</span></div>
+          <div><strong>ITAMMUN</strong><span>{t("moderator")}</span></div>
         </div>
-        <span className="open-access">Acceso abierto</span>
+        <div className="landing-actions"><span className="open-access">{t("openAccess")}</span><LanguageSwitcher /></div>
       </header>
 
       <section className="landing-intro">
         <p className="eyebrow">ITAM Model United Nations</p>
-        <h1>¿Qué comité vas a moderar?</h1>
-        <p>Selecciona un comité de ITAMMUN 2026 o empieza con un lienzo en blanco. No necesitas iniciar sesión.</p>
+        <h1>{t("landingQuestion")}</h1>
+        <p>{t("landingIntro")}</p>
       </section>
 
-      <section className="committee-grid" aria-label="Comités disponibles">
+      <section className="committee-grid" aria-label={t("availableCommittees")}>
         {committees.map((committee, index) => (
           <a
             className="committee-card"
@@ -41,25 +44,25 @@ export function CommitteePicker({ committees }: { committees: Committee[] }) {
             <h2>{committee.abbreviation}</h2>
             <p>{committee.name}</p>
             <div className="committee-meta">
-              <span>{committee.language}</span><span>{committee.level}</span><span>{committee.representationsCount} lugares</span>
+              <span>{committee.language}</span><span>{committee.level === "Bajo" ? t("lowLevel") : committee.level === "Alto" ? t("highLevel") : t("intermediateLevel")}</span><span>{t("places", { count: committee.representationsCount })}</span>
             </div>
-            <span className="card-action">Preparar debate <span aria-hidden>↗</span></span>
+            <span className="card-action">{t("prepareDebate")} <span aria-hidden>↗</span></span>
           </a>
         ))}
 
         <article className="committee-card blank-card">
           <span className="committee-number">+</span>
-          <span className="committee-secretariat">Lienzo en blanco</span>
-          <h2>Otro comité</h2>
-          <label htmlFor="custom-name">Nombre del comité</label>
-          <input id="custom-name" value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="Ej. Asamblea General" />
-          <button onClick={openBlankCanvas}>Preparar lienzo <span aria-hidden>↗</span></button>
+          <span className="committee-secretariat">{t("blankCanvas")}</span>
+          <h2>{t("otherCommittee")}</h2>
+          <label htmlFor="custom-name">{t("committeeName")}</label>
+          <input id="custom-name" value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder={t("committeeNamePlaceholder")} />
+          <button onClick={openBlankCanvas}>{t("prepareCanvas")} <span aria-hidden>↗</span></button>
         </article>
       </section>
 
       <footer className="landing-footer">
-        <span>Los enlaces de comité pueden compartirse con varias personas.</span>
-        <span>Datos de ITAMMUN 2026</span>
+        <span>{t("shareableLinks")}</span>
+        <span>{t("eventData")}</span>
       </footer>
     </main>
   );

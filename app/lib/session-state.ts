@@ -1,4 +1,5 @@
 import type { Representation } from "./itammun-api";
+import type { TranslationKey } from "./i18n";
 
 export type AttendanceStatus = "pending" | "absent" | "present" | "present-voting" | "observer";
 export type ConsoleTab = "speakers" | "rollcall" | "caucus" | "motions" | "voting" | "log";
@@ -7,6 +8,11 @@ export type VoteChoice = "for" | "against";
 export type SpeakerQueueItem = {
   id: string;
   name: string;
+};
+
+export type SessionEvent = {
+  key: TranslationKey;
+  values?: Record<string, string | number>;
 };
 
 export type Appeal = {
@@ -39,7 +45,7 @@ export type SessionState = {
   caucusExtension: number;
   appeals: Appeal[];
   vote: VoteState;
-  events: string[];
+  events: Array<string | SessionEvent>;
 };
 
 export function createInitialState(representations: Representation[]): SessionState {

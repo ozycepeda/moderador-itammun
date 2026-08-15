@@ -22,6 +22,8 @@ test("renders the open committee picker", async () => {
   assert.match(html, /<title>Moderador · ITAMMUN<\/title>/i);
   assert.match(html, /¿Qué comité vas a moderar\?/);
   assert.match(html, /Acceso abierto/);
+  assert.match(html, /aria-label="Español"/);
+  assert.match(html, /aria-label="English"/);
   assert.match(html, /ONU Mujeres/);
   assert.match(html, /Consejo de Seguridad/);
   assert.match(html, /Lienzo en blanco/);
@@ -43,6 +45,7 @@ test("renders setup and projector routes", async () => {
   assert.equal(setup.status, 200);
   const setupHtml = await setup.text();
   assert.match(setupHtml, /Marca los cupos asignados al inicio/);
+  assert.match(setupHtml, /aria-label="Idioma \/ Language"/);
   assert.doesNotMatch(setupHtml, /Cupo asignado|Disponible/);
   assert.match(setupHtml, /Santa Sede/);
   assert.doesNotMatch(setupHtml, /Tema de la sesión/);

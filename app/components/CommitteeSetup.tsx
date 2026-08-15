@@ -6,6 +6,8 @@ import { useMemo, useState } from "react";
 import type { Committee } from "../lib/committees";
 import type { CommitteeDetail, Representation } from "../lib/itammun-api";
 import { setupStorageKey, type StoredSetup } from "../lib/setup-state";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { useLanguage } from "./LanguageProvider";
 
 export function CommitteeSetup({ committee, detail, sessionKey }: {
   committee: Committee;
@@ -16,10 +18,12 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
   const [customParticipants, setCustomParticipants] = useState<Representation[]>([]);
   const [customName, setCustomName] = useState("");
   const [search, setSearch] = useState("");
+  const { language, t } = useLanguage();
 
-  const visible = useMemo(() => detail.representations.filter((item) => item.name.toLocaleLowerCase("es").includes(search.toLocaleLowerCase("es"))), [detail.representations, search]);
+  const visible = useMemo(() => detail.representations.filter((item) => item.name.toLocaleLowerCase(language).includes(search.toLocaleLowerCase(language))), [detail.representations, language, search]);
   const participants = [...detail.representations, ...customParticipants];
   const assignedParticipantIds = [...selected, ...customParticipants.map((participant) => participant.id)];
+  const secretariat = committee.slug.startsWith("lienzo-") ? t("blankCanvas") : committee.secretariat;
 
   function toggle(id: string) {
     setSelected((current) => {
@@ -50,25 +54,25 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
     <main className="setup-shell" style={cssVars}>
       <header className="console-header">
         <Link href="/" className="console-brand"><span className="brand-mark">I</span><span>ITAMMUN</span></Link>
-        <div className="committee-heading"><span>{committee.secretariat}</span><h1>{committee.abbreviation}</h1></div>
-        <span className="setup-step">Preparar sesión</span>
+        <div className="committee-heading"><span>{secretariat}</span><h1>{committee.abbreviation}</h1></div>
+        <div className="header-actions"><span className="setup-step">{t("prepareSession")}</span><LanguageSwitcher dark /></div>
       </header>
 
       <section className="setup-intro">
-        <p className="eyebrow">Preparación local</p>
-        <h2>Marca los cupos asignados al inicio</h2>
-        <p>Todos los países permanecerán disponibles en el pase de lista. Esta selección sólo identifica los cupos ocupados al comenzar.</p>
+        <p className="eyebrow">{t("localPreparation")}</p>
+        <h2>{t("markInitialSeats")}</h2>
+        <p>{t("setupExplanation")}</p>
       </section>
 
       <div className="setup-grid setup-grid-single">
         <section className="setup-panel participants-panel">
-          <div className="setup-panel-heading"><div><span className="section-kicker">Países y personas</span><h2>Cupos iniciales</h2></div><strong>{assignedParticipantIds.length}</strong></div>
+          <div className="setup-panel-heading"><div><span className="section-kicker">{t("countriesAndPeople")}</span><h2>{t("initialSeats")}</h2></div><strong>{assignedParticipantIds.length}</strong></div>
           {detail.representations.length > 0 && (
             <>
               <div className="catalog-tools">
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en el catálogo" aria-label="Buscar en el catálogo" />
-                <button onClick={() => setSelected(new Set(detail.representations.map((item) => item.id)))}>Marcar todos</button>
-                <button onClick={() => setSelected(new Set())}>Quitar marcas</button>
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("searchCatalog")} aria-label={t("searchCatalog")} />
+                <button onClick={() => setSelected(new Set(detail.representations.map((item) => item.id)))}>{t("markAll")}</button>
+                <button onClick={() => setSelected(new Set())}>{t("clearMarks")}</button>
               </div>
               <div className="setup-country-list">
                 {visible.map((item) => (
@@ -83,16 +87,16 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
           )}
 
           <form className="custom-participant-form" onSubmit={(event) => { event.preventDefault(); addCustomParticipant(); }}>
-            <label htmlFor="custom-participant">Agregar país o persona adicional</label>
-            <div><input id="custom-participant" value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="Nombre libre" /><button>Agregar</button></div>
+            <label htmlFor="custom-participant">{t("addParticipant")}</label>
+            <div><input id="custom-participant" value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder={t("freeName")} /><button>{t("add")}</button></div>
           </form>
-          {customParticipants.length > 0 && <ul className="custom-participants">{customParticipants.map((item) => <li key={item.id}><span>{item.name}</span><button onClick={() => setCustomParticipants((current) => current.filter((entry) => entry.id !== item.id))}>Quitar</button></li>)}</ul>}
+          {customParticipants.length > 0 && <ul className="custom-participants">{customParticipants.map((item) => <li key={item.id}><span>{item.name}</span><button onClick={() => setCustomParticipants((current) => current.filter((entry) => entry.id !== item.id))}>{t("remove")}</button></li>)}</ul>}
         </section>
       </div>
 
       <footer className="setup-footer">
-        <div><strong>{assignedParticipantIds.length} cupos iniciales</strong><span>{participants.length} países y personas disponibles en la sesión</span></div>
-        <button className="primary-button" disabled={participants.length === 0} onClick={startSession}>Iniciar sesión</button>
+        <div><strong>{t("initialSeatsCount", { count: assignedParticipantIds.length })}</strong><span>{t("availableParticipantsCount", { count: participants.length })}</span></div>
+        <button className="primary-button" disabled={participants.length === 0} onClick={startSession}>{t("startSession")}</button>
       </footer>
     </main>
   );

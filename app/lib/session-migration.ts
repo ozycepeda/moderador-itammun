@@ -1,4 +1,5 @@
-import type { AttendanceStatus, SessionState, SpeakerQueueItem, VoteChoice } from "./session-state";
+import { isTranslationKey } from "./i18n";
+import type { AttendanceStatus, SessionEvent, SessionState, SpeakerQueueItem, VoteChoice } from "./session-state";
 
 export function normalizeSessionState(value: unknown, fallback: SessionState): SessionState {
   if (!value || typeof value !== "object") return fallback;
@@ -22,6 +23,14 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
     storedAttendance[participant.id] ?? (participant.observer ? "observer" : "pending"),
   ])) as Record<string, AttendanceStatus>;
   const ballots = Object.fromEntries(Object.entries(stored.vote?.ballots ?? {}).filter((entry): entry is [string, VoteChoice] => entry[1] === "for" || entry[1] === "against"));
+  const rawEvents = Array.isArray(stored.events) ? stored.events as unknown[] : [];
+  const events = rawEvents.flatMap((event): Array<string | SessionEvent> => {
+    if (typeof event === "string") return [event];
+    if (!event || typeof event !== "object" || !("key" in event) || !isTranslationKey(event.key)) return [];
+    const rawValues = "values" in event && event.values && typeof event.values === "object" ? event.values as Record<string, unknown> : {};
+    const values = Object.fromEntries(Object.entries(rawValues).filter((entry): entry is [string, string | number] => typeof entry[1] === "string" || typeof entry[1] === "number"));
+    return [{ key: event.key, ...(Object.keys(values).length > 0 ? { values } : {}) }];
+  });
 
   return {
     ...fallback,
@@ -32,7 +41,7 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
     attendance,
     speakers,
     appeals: stored.appeals ?? fallback.appeals,
-    events: stored.events ?? fallback.events,
+    events: rawEvents.length > 0 ? events : fallback.events,
     vote: { ...fallback.vote, ...stored.vote, ballots },
   };
 }

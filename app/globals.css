@@ -33,6 +33,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .brand-lockup span:not(.brand-mark) { color: var(--muted); font-size: .74rem; text-transform: uppercase; letter-spacing: .14em; }
 .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--itam-gold); border-radius: 50%; color: var(--itam-gold); font-family: var(--font-playfair), serif; font-size: 1.1rem; }
 .open-access, .sync-state { padding: .46rem .72rem; border-radius: 999px; background: #e7efe9; color: var(--itam-green); font-size: .78rem; font-weight: 700; letter-spacing: .04em; }
+.landing-actions, .header-actions, .projector-header-actions { display: flex; align-items: center; gap: .7rem; }
+.language-switcher { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: white; }
+.language-switcher button { min-width: 36px; min-height: 30px; padding: 0 .45rem; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: .68rem; font-weight: 850; letter-spacing: .06em; }
+.language-switcher button[aria-pressed="true"] { background: var(--itam-ink); color: white; }
+.language-switcher-dark { border-color: #ffffff45; background: #ffffff12; }
+.language-switcher-dark button { color: #ffffffa8; }
+.language-switcher-dark button[aria-pressed="true"] { background: white; color: var(--committee-dark); }
 .landing-intro { max-width: 850px; padding: clamp(3rem, 8vw, 7rem) 0 clamp(2rem, 4vw, 3.5rem); }
 .eyebrow, .section-kicker { color: var(--itam-gold); font-size: .7rem; font-weight: 800; letter-spacing: .17em; text-transform: uppercase; }
 .landing-intro h1 { max-width: 760px; margin: .6rem 0 1rem; font-size: clamp(2.6rem, 6vw, 5.6rem); font-weight: 500; line-height: .98; letter-spacing: -.045em; }
@@ -175,9 +182,9 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 
 .projector-shell { min-height: 100vh; display: flex; flex-direction: column; background: var(--committee-dark); color: white; }
 .projector-header { min-height: 84px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0 clamp(1.2rem, 4vw, 4rem); border-bottom: 1px solid #ffffff25; }
-.projector-header > div { display: grid; justify-items: end; gap: .15rem; }
-.projector-header > div span { color: color-mix(in srgb, var(--committee-color), white 35%); font-size: .62rem; letter-spacing: .13em; text-transform: uppercase; }
-.projector-header > div strong { font-family: var(--font-playfair), serif; font-size: 1.25rem; }
+.projector-committee-heading { display: grid; justify-items: end; gap: .15rem; }
+.projector-committee-heading span { color: color-mix(in srgb, var(--committee-color), white 35%); font-size: .62rem; letter-spacing: .13em; text-transform: uppercase; }
+.projector-committee-heading strong { font-family: var(--font-playfair), serif; font-size: 1.25rem; }
 .projector-content { flex: 1; display: grid; place-items: center; padding: clamp(2rem, 6vw, 6rem); text-align: center; }
 .projector-vote, .projector-result, .projector-idle { width: min(1100px, 100%); display: flex; flex-direction: column; align-items: center; }
 .projector-kicker { color: color-mix(in srgb, var(--committee-color), white 38%); font-size: clamp(.7rem, 1.3vw, 1rem); font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
@@ -275,6 +282,7 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
   .speakers-layout, .caucus-layout { grid-template-columns: 1fr; }
   .speaker-stage, .caucus-clock { min-height: 500px; }
   .sharing-tools .sync-state { display: none; }
+  .sharing-tools { gap: .35rem; }
   .topic-strip { align-items: stretch; flex-direction: column; }
   .topic-strip select, .topic-strip input { width: 100%; }
   .setup-grid { grid-template-columns: 1fr; }
@@ -293,6 +301,9 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
   .committee-heading span { display: none; }
   .console-brand > span:last-child { display: none; }
   .console-header .secondary-button { padding: 0 .55rem; }
+  .sharing-tools .secondary-button:nth-of-type(2), .sharing-tools > button.secondary-button { display: none; }
+  .language-switcher button { min-width: 32px; padding-inline: .35rem; }
+  .landing-actions .open-access { display: none; }
   .topic-strip form { flex-direction: column; }
   .attendance-summary { grid-template-columns: repeat(2, 1fr); }
   .attendance-summary span:nth-child(2) { border-right: 0; }
