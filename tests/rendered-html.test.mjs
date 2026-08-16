@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function render(path = "/", { env = {}, headers = {} } = {}) {
@@ -62,6 +63,13 @@ test("renders setup and projector routes", async () => {
   const projector = await render("/comite/onu-mujeres/pantalla");
   assert.equal(projector.status, 200);
   assert.match(await projector.text(), /Esperando el inicio del debate/);
+});
+
+test("keeps the setup catalog wide and responsive", async () => {
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(css, /\.setup-grid\.setup-grid-single\s*\{[^}]*max-width:\s*none/);
+  assert.match(css, /\.setup-country-list\s*\{[^}]*repeat\(auto-fit,\s*minmax\(290px,\s*1fr\)\)/);
+  assert.match(css, /@media\s*\(max-width:\s*620px\)[\s\S]*\.setup-country-list\s*\{\s*grid-template-columns:\s*1fr/);
 });
 
 test("keeps every deployment public", async () => {
