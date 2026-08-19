@@ -10,13 +10,23 @@ import { useLanguage } from "./LanguageProvider";
 export function ProjectorView({ committee, sessionKey }: { committee: Committee; sessionKey: string }) {
   const { t } = useLanguage();
   const { state } = useLocalCommitteeState(sessionKey, createInitialState([]));
-  const voterId = state.vote.status === "active" ? state.vote.queue[state.vote.currentIndex] : undefined;
-  const voter = state.participants.find((participant) => participant.id === voterId);
-  const ballots = Object.values(state.vote.ballots);
-  const counts = {
-    for: ballots.filter((choice) => choice === "for").length,
-    against: ballots.filter((choice) => choice === "against").length,
+  const appealVoterId = state.vote.status === "active" ? state.vote.queue[state.vote.currentIndex] : undefined;
+  const appealVoter = state.participants.find((participant) => participant.id === appealVoterId);
+  const appealBallots = Object.values(state.vote.ballots);
+  const appealCounts = {
+    for: appealBallots.filter((choice) => choice === "for").length,
+    against: appealBallots.filter((choice) => choice === "against").length,
   };
+  const finalParticipantId = state.finalVote.phase === "explanations"
+    ? state.finalVote.explanationQueue[state.finalVote.explanationIndex]
+    : state.finalVote.queue[state.finalVote.currentIndex];
+  const finalParticipant = state.participants.find((participant) => participant.id === finalParticipantId);
+  const finalBallots = Object.values(state.finalVote.roundThree);
+  const finalCounts = {
+    for: finalBallots.filter((choice) => choice === "for").length,
+    against: finalBallots.filter((choice) => choice === "against").length,
+  };
+  const finalRoundKey = state.finalVote.phase === "round-one" ? "finalRoundOne" : state.finalVote.phase === "round-two" ? "finalRoundTwo" : "finalRoundThree";
   const secretariat = committee.slug.startsWith("lienzo-") ? t("blankCanvas") : committee.secretariat;
   const cssVars = { "--committee-color": committee.color, "--committee-dark": committee.darkColor } as React.CSSProperties;
 
@@ -28,26 +38,42 @@ export function ProjectorView({ committee, sessionKey }: { committee: Committee;
       </header>
 
       <section className="projector-content">
-        {state.vote.status === "active" && voter ? (
+        {state.vote.status === "active" && appealVoter ? (
           <div className="projector-vote">
-            <span className="projector-kicker">{t("nominalVoteProgress", { current: state.vote.currentIndex + 1, total: state.vote.queue.length })}</span>
+            <span className="projector-kicker">{t("immediateVote")} · {t("voteProgress", { current: state.vote.currentIndex + 1, total: state.vote.queue.length })}</span>
             <p>{state.vote.label}</p>
-            {voter.flagUrl && <Image src={voter.flagUrl} alt="" width={192} height={128} unoptimized priority />}
-            <span className="projector-action">{t("castingVote")}</span>
-            <h1>{voter.name}</h1>
+            {appealVoter.flagUrl && <Image src={appealVoter.flagUrl} alt="" width={192} height={128} unoptimized priority />}
+            <span className="projector-action">{t("castingVote")}</span><h1>{appealVoter.name}</h1>
+          </div>
+        ) : state.finalVote.phase === "explanations" && finalParticipant ? (
+          <div className="projector-vote projector-explanation">
+            <span className="projector-kicker">{t("voteExplanations")} · {state.finalVote.explanationIndex + 1}/{state.finalVote.explanationQueue.length}</span>
+            <p>{state.finalVote.label}</p>
+            {finalParticipant.flagUrl && <Image src={finalParticipant.flagUrl} alt="" width={192} height={128} unoptimized priority />}
+            <span className="projector-action">{t("explainingVote")}</span><h1>{finalParticipant.name}</h1>
+            <strong className="projector-choice">{t(state.finalVote.roundTwo[finalParticipant.id] === "for-explanation" ? "forWithExplanation" : "againstWithExplanation")}</strong>
+            {(state.warnings[finalParticipant.id] ?? 0) > 0 && <span className="projector-warning">{t("warningBadge", { count: state.warnings[finalParticipant.id] })}</span>}
+          </div>
+        ) : (state.finalVote.phase === "round-one" || state.finalVote.phase === "round-two" || state.finalVote.phase === "round-three") && finalParticipant ? (
+          <div className="projector-vote">
+            <span className="projector-kicker">{t("roundProgress", { round: t(finalRoundKey), current: state.finalVote.currentIndex + 1, total: state.finalVote.queue.length })}</span>
+            <p>{state.finalVote.label}</p>
+            {finalParticipant.flagUrl && <Image src={finalParticipant.flagUrl} alt="" width={192} height={128} unoptimized priority />}
+            <span className="projector-action">{t("castingVote")}</span><h1>{finalParticipant.name}</h1>
+            {(state.warnings[finalParticipant.id] ?? 0) > 0 && <span className="projector-warning">{t("warningBadge", { count: state.warnings[finalParticipant.id] })}</span>}
+          </div>
+        ) : state.finalVote.phase === "complete" ? (
+          <div className="projector-result">
+            <span className="projector-kicker">{t("finalVoteResult")}</span><h1>{state.finalVote.label}</h1>
+            <div className="projector-counts projector-counts-two"><div><strong>{finalCounts.for}</strong><span>{t("inFavor")}</span></div><div><strong>{finalCounts.against}</strong><span>{t("against")}</span></div></div>
           </div>
         ) : state.vote.status === "complete" ? (
           <div className="projector-result">
-            <span className="projector-kicker">{t("voteComplete")}</span>
-            <h1>{state.vote.label}</h1>
-            <div className="projector-counts projector-counts-two"><div><strong>{counts.for}</strong><span>{t("inFavor")}</span></div><div><strong>{counts.against}</strong><span>{t("against")}</span></div></div>
+            <span className="projector-kicker">{t("voteComplete")}</span><h1>{state.vote.label}</h1>
+            <div className="projector-counts projector-counts-two"><div><strong>{appealCounts.for}</strong><span>{t("inFavor")}</span></div><div><strong>{appealCounts.against}</strong><span>{t("against")}</span></div></div>
           </div>
         ) : (
-          <div className="projector-idle">
-            <span className="projector-kicker">{t("sessionInProgress")}</span>
-            <h1>{state.topic || t("waitingForDebate")}</h1>
-            {state.currentSpeaker && <p>{t("atPodium")} <strong>{state.currentSpeaker}</strong></p>}
-          </div>
+          <div className="projector-idle"><span className="projector-kicker">{t("sessionInProgress")}</span><h1>{state.topic || t("waitingForDebate")}</h1>{state.currentSpeaker && <p>{t("atPodium")} <strong>{state.currentSpeaker}</strong></p>}</div>
         )}
       </section>
     </main>
