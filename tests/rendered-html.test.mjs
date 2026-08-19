@@ -57,6 +57,8 @@ test("renders setup and projector routes", async () => {
   assert.match(consoleHtml, /Pase de lista/);
   assert.match(consoleHtml, /Presente y votando/);
   assert.match(consoleHtml, /Observador/);
+  assert.match(consoleHtml, /Llamadas de atención/);
+  assert.match(consoleHtml, /Votación final/);
   assert.match(consoleHtml, /Pendiente · defínelo/);
   assert.doesNotMatch(consoleHtml, /Tiempo por orador/);
 

@@ -324,3 +324,21 @@ No quedan preguntas funcionales bloqueantes para comenzar la implementación.
 La interfaz completa en español e inglés usa un selector global `ES | EN`, un diccionario tipado de traducciones y persistencia en `localStorage[itammun:language]`. No cambia PostgreSQL, no duplica rutas ni modifica las sesiones guardadas.
 
 El cambio cubre navegación, formularios, estados de asistencia, accesibilidad, mensajes vacíos, controles de tiempo, votaciones, proyector y eventos nuevos de la bitácora. Los nombres oficiales de comités, países y tópicos conservan el idioma entregado por el catálogo hasta que la fuente real ofrezca traducciones. Esta separación permite añadir otros idiomas sin reescribir los componentes.
+
+## 10. Iteración de protocolo v3
+
+La tercera iteración incorpora cuatro flujos sin cambiar el catálogo PostgreSQL ni añadir un backend:
+
+1. **Oradores:** fila extraordinaria de preguntas, tiempo compartido con el orador y cesión del remanente a la Mesa o al siguiente turno.
+2. **Caucus:** vistas independientes para moderado y simple, cada una con duración y extensión `−1 segundo` propias.
+3. **Pase de lista:** subpestaña de llamadas de atención con contador acumulable y corrección del último clic.
+4. **Votación final:** una fila congelada de participantes `Presente y votando`, tres rondas nominales, explicaciones sin tiempo entre las rondas dos y tres, y resultado calculado con la tercera ronda.
+
+Decisiones confirmadas para esta versión:
+
+- todos los participantes elegibles votan en todas las rondas;
+- pueden abstenerse en las rondas uno y dos, incluso con llamadas de atención;
+- las llamadas de atención no tienen límite ni castigo automático;
+- el tópico existente es la materia de la votación final;
+- la votación iniciada no cambia por modificaciones posteriores de asistencia;
+- el estado local anterior se migra a la versión 3 sin perder tópico, asistencia, colas, caucus ni apelaciones.

@@ -8,10 +8,11 @@ Prototipo funcional para preparar y conducir debates de ITAMMUN. El catálogo de
 - Interfaz completa en español e inglés con preferencia persistente entre páginas y pestañas.
 - Setup obligatorio para marcar los cupos ocupados; el catálogo completo permanece disponible.
 - Pase de lista siempre editable con botones de estado; después se elige o crea el tópico.
-- Lista de oradores limitada a los participantes de la sesión, reordenable por arrastre, botones o teclado.
-- Caucus moderado en una sola vista con tiempo total y extensión de un segundo menos.
+- Lista de oradores reordenable, sesión extraordinaria de preguntas y cesión del tiempo restante a la Mesa o al siguiente orador.
+- Caucus moderado y caucus simple con cronómetros independientes y extensión de un segundo menos.
+- Llamadas de atención acumulables desde Pase de lista, sin sanciones automáticas.
 - Apelaciones procesales con votación inmediata.
-- Votación nominal exclusiva para países `presente y votando` y pantalla de proyector.
+- Votación final nominal en tres rondas, exclusiva para países `presente y votando`, con explicaciones entre la segunda y tercera ronda.
 - Sincronización entre pestañas del mismo navegador mediante `BroadcastChannel`.
 - Acceso público, sin cuentas ni contraseña.
 - Manifiesto PWA: la web puede instalarse desde un navegador compatible.

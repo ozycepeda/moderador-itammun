@@ -1,42 +1,60 @@
 # Votación y decisiones de protocolo
 
-## Configuración elegida
+## Votación final en tres rondas
 
-La primera versión usa votación **nominal**. Cada miembro elegible aparece por turno, la Mesa registra su voto y la pantalla pública muestra el país o persona actual.
+La consola congela una sola fila al iniciar la votación. Entran exclusivamente los países o personas cuyo estado sea `presente y votando`, y todos participan en las tres rondas aunque su asistencia cambie después de comenzar.
 
-La regla está representada directamente por el tipo `VoteChoice` y por el filtro de elegibilidad de la consola. La cola se congela al iniciar cada votación para que un cambio posterior de asistencia no altere una votación en curso.
+1. Primera ronda: `A favor`, `En contra` o `Abstención`.
+2. Segunda ronda: las tres opciones anteriores, además de `A favor con derecho a explicación` y `En contra con derecho a explicación`.
+3. Explicaciones: antes de la tercera ronda se presentan, uno por uno y sin cronómetro, quienes solicitaron el derecho en la segunda ronda.
+4. Tercera ronda: `A favor` o `En contra`.
 
-Para cambiar a captura agregada en el futuro, se puede sustituir la interfaz de llamada individual por dos totales (`for`, `against`). Conviene conservar el modelo `ballots` para apelaciones o votaciones que necesiten trazabilidad nominal.
+El resultado definitivo se calcula exclusivamente con la tercera ronda. El sistema conserva las tres papeletas nominales para auditoría local. Las amonestaciones aparecen junto al país durante la votación y en el resumen, pero no eliminan el derecho a votar ni cambian el resultado.
 
-## Elegibilidad
+Esta es una decisión operativa de ITAMMUN para esta versión. Aunque algunas reglas de Modelo ONU limitan la abstención de quienes se declaran presentes y votando, la aplicación permite abstenerse en las rondas uno y dos por indicación expresa de las organizadoras.
 
-- `presente y votando`: entra a la fila nominal y elige a favor o en contra;
-- `presente`, `observador`, `ausente` o `sin registrar`: no entra a la fila.
+## Elegibilidad y cambios de asistencia
 
-No se ofrece abstención. Los observadores tampoco cuentan para quórum o mayorías.
+- `presente y votando`: entra a todas las rondas y puede abstenerse en las rondas uno y dos;
+- `presente`, `observador`, `ausente` o `sin registrar`: no entra a la votación final;
+- las llamadas de atención son informativas y acumulables, sin máximo ni sanción automática;
+- una votación ya iniciada mantiene su fila congelada;
+- reiniciar la votación vuelve a tomar el estado de asistencia vigente.
+
+## Lista de oradores, preguntas y cesiones
+
+La sesión extraordinaria de preguntas vive dentro de Oradores. Sólo permite elegir países o personas del catálogo de la sesión y utiliza el mismo tiempo configurado para un orador. Su fila es independiente y reordenable.
+
+Cuando un orador termina antes de tiempo puede ceder el remanente:
+
+- a la Mesa, con lo que concluye su intervención; o
+- al siguiente orador, que recibe su tiempo base más el remanente.
+
+Para evitar una cadena indefinida de tiempo donado, quien ya recibió una donación no puede volver a ceder ese remanente al siguiente orador. La cesión a la Mesa sigue disponible.
+
+## Caucus moderado y simple
+
+La aplicación mantiene dos cronómetros independientes:
+
+- el caucus moderado conserva la conducción de la Mesa y turnos reconocidos;
+- el caucus simple permite negociación informal sin una lista central de oradores.
+
+Ambos muestran el tópico, aceptan tiempo por teclado y ofrecen reiniciar, iniciar/pausar, aplicar la extensión de un segundo menos y finalizar. El caucus simple no duplica una lista de participantes ni una descripción, porque su diferencia operativa es la ausencia de turnos moderados.
+
+Referencias generales de procedimiento:
+
+- [ONU — Reglas de procedimiento para conferencias Modelo ONU](https://www.un.org/en/model-united-nations/rules-procedure)
+- [ONU — Reglas de procedimiento de la Asamblea General](https://www.un.org/en/ga/about/ropga/ropga_plenary.shtml)
 
 ## Apelación a una decisión de la Mesa
 
-La recomendación se basa en las reglas de procedimiento de la Asamblea General de Naciones Unidas: una decisión de la presidencia sobre un punto de orden puede apelarse; la apelación se somete inmediatamente a votación y la decisión permanece salvo que una mayoría de miembros presentes y votando la revoque.
+Las apelaciones siguen separadas de la votación final. La consola registra quién apela y la decisión cuestionada, y abre inmediatamente una votación de `A favor` o `En contra` entre quienes estén `presente y votando` al iniciarla. Si hay más votos a favor, la decisión se revoca; en empate o mayoría en contra, se mantiene.
 
-Implementación:
-
-1. Se registra quién apela y qué decisión cuestiona.
-2. Se abre inmediatamente la pregunta `¿Se revoca la decisión de la Mesa?`.
-3. Se llama nominalmente a los miembros elegibles.
-4. Cada país vota a favor o en contra; no hay abstenciones.
-5. Si `a favor > en contra`, la decisión queda revocada; en cualquier otro caso se mantiene.
-
-Referencias:
-
-- [ONU — Reglas de procedimiento de la Asamblea General, punto de orden](https://www.un.org/en/ga/about/ropga/ropga_plenary.shtml)
-- [ONU — Anexo IV: votación inmediata y carácter no debatible](https://www.un.org/en/ga/about/ropga/ropga_anx4.shtml)
-
-Esta regla debe confirmarse contra el reglamento interno de ITAMMUN antes del evento.
+Referencia: [ONU — Anexo IV: votación inmediata y carácter no debatible](https://www.un.org/en/ga/about/ropga/ropga_anx4.shtml).
 
 ## Regla de un segundo menos
 
-No es un botón para restar tiempo al reloj activo. Se usa para proponer una extensión de caucus menor que la duración original.
+No resta tiempo a un reloj activo. Inicia una extensión cuya duración es un segundo menor que la duración original del caucus seleccionado.
 
 Referencias:
 
