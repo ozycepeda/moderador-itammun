@@ -37,7 +37,16 @@ export type VoteState = {
 
 export type FinalVoteRoundOneChoice = VoteChoice | "abstain";
 export type FinalVoteRoundTwoChoice = FinalVoteRoundOneChoice | "for-explanation" | "against-explanation";
-export type FinalVotePhase = "idle" | "round-one" | "round-two" | "explanations" | "round-three" | "complete";
+export type FinalVotePhase =
+  | "idle"
+  | "round-one"
+  | "round-one-complete"
+  | "round-two"
+  | "round-two-complete"
+  | "explanations"
+  | "explanations-complete"
+  | "round-three"
+  | "complete";
 
 export type FinalVoteState = {
   label: string;
@@ -105,7 +114,7 @@ export function castFinalVote(
     if (choice === "for-explanation" || choice === "against-explanation") return vote;
     const roundOne = { ...vote.roundOne, [participantId]: choice };
     if (vote.currentIndex < vote.queue.length - 1) return { ...vote, roundOne, currentIndex: vote.currentIndex + 1 };
-    return { ...vote, roundOne, phase: "round-two", currentIndex: 0 };
+    return { ...vote, roundOne, phase: "round-one-complete", currentIndex: 0 };
   }
 
   if (vote.phase === "round-two") {
@@ -121,7 +130,7 @@ export function castFinalVote(
       explanationQueue,
       explanationIndex: 0,
       currentIndex: 0,
-      phase: explanationQueue.length > 0 ? "explanations" : "round-three",
+      phase: "round-two-complete",
     };
   }
 
@@ -139,7 +148,25 @@ export function advanceFinalVoteExplanation(vote: FinalVoteState): FinalVoteStat
   if (vote.explanationIndex < vote.explanationQueue.length - 1) {
     return { ...vote, explanationIndex: vote.explanationIndex + 1 };
   }
-  return { ...vote, phase: "round-three", currentIndex: 0 };
+  return { ...vote, phase: "explanations-complete", currentIndex: 0 };
+}
+
+export function advanceFinalVoteStage(vote: FinalVoteState): FinalVoteState {
+  if (vote.phase === "round-one-complete") {
+    return { ...vote, phase: "round-two", currentIndex: 0 };
+  }
+  if (vote.phase === "round-two-complete") {
+    return {
+      ...vote,
+      phase: vote.explanationQueue.length > 0 ? "explanations" : "round-three",
+      currentIndex: 0,
+      explanationIndex: 0,
+    };
+  }
+  if (vote.phase === "explanations-complete") {
+    return { ...vote, phase: "round-three", currentIndex: 0 };
+  }
+  return vote;
 }
 
 export function createInitialState(representations: Representation[]): SessionState {

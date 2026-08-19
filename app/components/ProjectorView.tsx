@@ -45,6 +45,14 @@ export function ProjectorView({ committee, sessionKey }: { committee: Committee;
             {appealVoter.flagUrl && <Image src={appealVoter.flagUrl} alt="" width={192} height={128} unoptimized priority />}
             <span className="projector-action">{t("castingVote")}</span><h1>{appealVoter.name}</h1>
           </div>
+        ) : (state.finalVote.phase === "round-one-complete" || state.finalVote.phase === "round-two-complete" || state.finalVote.phase === "explanations-complete") ? (
+          <div className="projector-transition">
+            <span className="projector-kicker">{t("votingStageComplete")}</span>
+            <p>{state.finalVote.label}</p>
+            <h1>{t(state.finalVote.phase === "round-one-complete" ? "firstRoundComplete" : state.finalVote.phase === "round-two-complete" ? "secondRoundComplete" : "explanationsComplete")}</h1>
+            <div className="projector-stage-divider" aria-hidden="true"><span>✓</span><i /><span>{state.finalVote.phase === "round-one-complete" ? "2" : "3"}</span></div>
+            <strong>{t("waitingForChair")}</strong>
+          </div>
         ) : state.finalVote.phase === "explanations" && finalParticipant ? (
           <div className="projector-vote projector-explanation">
             <span className="projector-kicker">{t("voteExplanations")} · {state.finalVote.explanationIndex + 1}/{state.finalVote.explanationQueue.length}</span>

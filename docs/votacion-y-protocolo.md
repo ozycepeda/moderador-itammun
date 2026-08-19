@@ -9,6 +9,8 @@ La consola congela una sola fila al iniciar la votación. Entran exclusivamente 
 3. Explicaciones: antes de la tercera ronda se presentan, uno por uno y sin cronómetro, quienes solicitaron el derecho en la segunda ronda.
 4. Tercera ronda: `A favor` o `En contra`.
 
+Al cerrar cada etapa, la consola se detiene en una pantalla de transición. La Mesa debe confirmar manualmente el inicio de la segunda ronda, las explicaciones y la tercera ronda; la pantalla pública muestra la misma pausa y espera la indicación de la Mesa.
+
 El resultado definitivo se calcula exclusivamente con la tercera ronda. El sistema conserva las tres papeletas nominales para auditoría local. Las amonestaciones aparecen junto al país durante la votación y en el resumen, pero no eliminan el derecho a votar ni cambian el resultado.
 
 Esta es una decisión operativa de ITAMMUN para esta versión. Aunque algunas reglas de Modelo ONU limitan la abstención de quienes se declaran presentes y votando, la aplicación permite abstenerse en las rondas uno y dos por indicación expresa de las organizadoras.

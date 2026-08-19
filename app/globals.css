@@ -274,6 +274,14 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .final-vote-actions.five-options button:nth-child(4) { border-color: var(--success); color: var(--success); }
 .final-vote-actions.five-options button:nth-child(5) { border-color: var(--danger); color: var(--danger); }
 .explanation-next { min-height: 48px; margin-top: 1.2rem; padding: 0 1.2rem; }
+.final-vote-transition { min-height: 520px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: clamp(2rem, 6vw, 5rem); text-align: center; background: linear-gradient(145deg, color-mix(in srgb, var(--committee-color) 10%, white), white 55%); }
+.final-vote-transition h2 { max-width: 760px; margin: .55rem 0 .8rem; font-size: clamp(2.4rem, 5vw, 4.8rem); font-weight: 500; line-height: 1; }
+.final-vote-transition > p { max-width: 620px; margin: 0; color: var(--muted); font-size: 1rem; line-height: 1.65; }
+.final-vote-transition > .primary-button { min-height: 52px; padding: 0 1.35rem; }
+.stage-divider, .projector-stage-divider { width: min(420px, 80%); display: grid; grid-template-columns: 52px 1fr 52px; align-items: center; margin: 2.4rem 0; }
+.stage-divider span, .projector-stage-divider span { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 50%; background: var(--committee-dark); color: white; font-family: var(--font-playfair), serif; font-size: 1.4rem; }
+.stage-divider span:last-child { background: var(--committee-color); color: var(--committee-dark); }
+.stage-divider i, .projector-stage-divider i { height: 2px; background: linear-gradient(90deg, var(--committee-dark), var(--committee-color)); }
 .final-vote-audit { width: min(760px, 100%); max-height: 300px; overflow-y: auto; margin: 0 0 1.5rem; border-top: 1px solid var(--line); }
 .final-vote-audit > div { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: .8rem; min-height: 46px; padding: .4rem; border-bottom: 1px solid var(--line); text-align: left; }
 .final-vote-audit strong { color: var(--committee-dark); font-size: .72rem; }
@@ -281,6 +289,13 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .procedural-vote { margin-top: 1rem; }
 .inline-link { justify-self: start; padding: 0; border: 0; background: transparent; color: var(--committee-color); font-size: .75rem; font-weight: 800; text-decoration: underline; }
 .vote-counts-two, .projector-counts-two { grid-template-columns: repeat(2, minmax(150px, 240px)); }
+.projector-transition { width: min(1100px, 100%); display: flex; flex-direction: column; align-items: center; }
+.projector-transition > p { max-width: 850px; margin: 1rem 0 1.7rem; color: #ffffffa8; font-size: clamp(1rem, 2vw, 1.4rem); }
+.projector-transition h1 { max-width: 1000px; margin: 0; font-size: clamp(3rem, 7vw, 7rem); font-weight: 500; line-height: .96; }
+.projector-transition > strong { color: #ffffffa8; font-size: clamp(.85rem, 1.5vw, 1.1rem); letter-spacing: .08em; text-transform: uppercase; }
+.projector-stage-divider span { border: 1px solid #ffffff60; background: transparent; }
+.projector-stage-divider span:last-child { border-color: var(--committee-color); color: var(--committee-color); }
+.projector-stage-divider i { background: linear-gradient(90deg, #ffffff70, var(--committee-color)); }
 .setup-shell { min-height: 100vh; padding-bottom: 110px; background: var(--paper); }
 .setup-step { color: color-mix(in srgb, var(--committee-color), white 35%); font-size: .72rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
 .setup-intro { max-width: 850px; padding: clamp(2.5rem, 6vw, 5rem) clamp(1rem, 4vw, 4rem) 2rem; }

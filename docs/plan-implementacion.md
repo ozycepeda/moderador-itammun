@@ -334,6 +334,8 @@ La tercera iteración incorpora cuatro flujos sin cambiar el catálogo PostgreSQ
 3. **Pase de lista:** subpestaña de llamadas de atención con contador acumulable y corrección del último clic.
 4. **Votación final:** una fila congelada de participantes `Presente y votando`, tres rondas nominales, explicaciones sin tiempo entre las rondas dos y tres, y resultado calculado con la tercera ronda.
 
+Cada cambio de etapa muestra una pantalla de separación sincronizada con el proyector. La votación no avanza hasta que la Mesa pulse el control para comenzar la siguiente ronda o las explicaciones.
+
 Decisiones confirmadas para esta versión:
 
 - todos los participantes elegibles votan en todas las rondas;
