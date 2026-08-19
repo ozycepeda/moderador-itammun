@@ -14,6 +14,7 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
   const [hydrated, setHydrated] = useState(false);
   const initialStateRef = useRef(initialState);
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const receivedFromChannelRef = useRef(false);
 
   useEffect(() => {
     const storedSession = window.localStorage.getItem(sessionStorageKey(sessionKey));
@@ -37,7 +38,10 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
 
     const channel = new BroadcastChannel(`itammun:${sessionKey}`);
     channelRef.current = channel;
-    channel.onmessage = (event) => setState(normalizeSessionState(event.data, initialStateRef.current));
+    channel.onmessage = (event) => {
+      receivedFromChannelRef.current = true;
+      setState(normalizeSessionState(event.data, initialStateRef.current));
+    };
     return () => {
       channel.close();
       channelRef.current = null;
@@ -47,6 +51,10 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
   useEffect(() => {
     if (!hydrated) return;
     window.localStorage.setItem(sessionStorageKey(sessionKey), JSON.stringify(state));
+    if (receivedFromChannelRef.current) {
+      receivedFromChannelRef.current = false;
+      return;
+    }
     channelRef.current?.postMessage(state);
   }, [hydrated, sessionKey, state]);
 
