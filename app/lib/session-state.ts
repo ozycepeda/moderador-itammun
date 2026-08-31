@@ -65,8 +65,15 @@ export type CaucusState = {
   extension: number;
 };
 
+export type SessionMetadata = {
+  id: string;
+  title: string;
+  startedAt: string;
+};
+
 export type SessionState = {
-  schemaVersion: 3;
+  schemaVersion: 4;
+  session: SessionMetadata;
   topic: string;
   participants: Representation[];
   assignedParticipantIds: string[];
@@ -172,7 +179,8 @@ export function advanceFinalVoteStage(vote: FinalVoteState): FinalVoteState {
 export function createInitialState(representations: Representation[]): SessionState {
   const defaultCaucus = { duration: 600, extension: 599 };
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
+    session: { id: "", title: "", startedAt: "" },
     topic: "",
     participants: representations,
     assignedParticipantIds: representations.map((representation) => representation.id),
@@ -194,5 +202,14 @@ export function createInitialState(representations: Representation[]): SessionSt
     vote: { label: "", context: "appeal", queue: [], currentIndex: 0, ballots: {}, status: "idle" },
     finalVote: createInitialFinalVoteState(),
     events: [],
+  };
+}
+
+export function getDisciplinaryCounts(totalWarnings: number) {
+  const total = Math.max(0, Math.floor(totalWarnings));
+  return {
+    totalWarnings: total,
+    activeWarnings: total % 3,
+    faults: Math.floor(total / 3),
   };
 }

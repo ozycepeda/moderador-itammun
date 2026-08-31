@@ -67,11 +67,24 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
   } : initialFinalVote;
   const moderatedDuration = stored.caucuses?.moderated?.duration ?? stored.caucusDuration ?? fallback.caucuses.moderated.duration;
   const moderatedExtension = stored.caucuses?.moderated?.extension ?? stored.caucusExtension ?? Math.max(0, moderatedDuration - 1);
+  const storedSession = stored.session;
+  const session = storedSession && typeof storedSession === "object"
+    ? {
+        id: typeof storedSession.id === "string" && storedSession.id ? storedSession.id : crypto.randomUUID(),
+        title: typeof storedSession.title === "string" ? storedSession.title : "",
+        startedAt: typeof storedSession.startedAt === "string" && storedSession.startedAt ? storedSession.startedAt : new Date().toISOString(),
+      }
+    : {
+        id: crypto.randomUUID(),
+        title: "",
+        startedAt: new Date().toISOString(),
+      };
 
   return {
     ...fallback,
     ...stored,
-    schemaVersion: 3,
+    schemaVersion: 4,
+    session,
     participants,
     assignedParticipantIds: stored.assignedParticipantIds ?? storedParticipants.map((participant) => participant.id),
     attendance,

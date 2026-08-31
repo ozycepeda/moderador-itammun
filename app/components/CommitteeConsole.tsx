@@ -6,12 +6,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { Committee } from "../lib/committees";
 import type { CommitteeDetail } from "../lib/itammun-api";
 import { useLocalCommitteeState } from "../hooks/useLocalCommitteeState";
+import { attendanceCsvFilename, buildAttendanceCsv } from "../lib/attendance-csv";
 import {
   advanceFinalVoteExplanation,
   advanceFinalVoteStage,
   castFinalVote,
   createInitialFinalVoteState,
   createInitialState,
+  getDisciplinaryCounts,
   startFinalVote,
   type AttendanceStatus,
   type CaucusMode,
@@ -126,6 +128,11 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
   const activeCaucus = state.caucuses[caucusMode];
   const secretariat = committee.slug.startsWith("lienzo-") ? t("blankCanvas") : committee.secretariat;
 
+  function disciplinaryLabel(totalWarnings: number) {
+    const discipline = getDisciplinaryCounts(totalWarnings);
+    return t("disciplinaryBadge", { warnings: discipline.activeWarnings, faults: discipline.faults });
+  }
+
   function updateTopic(topic: string) {
     update((current) => ({
       ...current,
@@ -209,16 +216,36 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
 
   function addWarning(participantId: string, name: string) {
     update((current) => {
-      const count = (current.warnings[participantId] ?? 0) + 1;
-      return { ...current, warnings: { ...current.warnings, [participantId]: count }, events: [{ key: "eventWarningAdded", values: { name, count } }, ...current.events] };
+      const previousCount = current.warnings[participantId] ?? 0;
+      const count = previousCount + 1;
+      const previousFaults = getDisciplinaryCounts(previousCount).faults;
+      const faults = getDisciplinaryCounts(count).faults;
+      const faultEvent: SessionState["events"] = faults > previousFaults ? [{ key: "eventFaultAdded", values: { name, count: faults } }] : [];
+      return { ...current, warnings: { ...current.warnings, [participantId]: count }, events: [...faultEvent, { key: "eventWarningAdded", values: { name, count } }, ...current.events] };
     });
   }
 
   function undoWarning(participantId: string, name: string) {
     update((current) => {
-      const count = Math.max(0, (current.warnings[participantId] ?? 0) - 1);
-      return { ...current, warnings: { ...current.warnings, [participantId]: count }, events: [{ key: "eventWarningRemoved", values: { name, count } }, ...current.events] };
+      const previousCount = current.warnings[participantId] ?? 0;
+      const count = Math.max(0, previousCount - 1);
+      const previousFaults = getDisciplinaryCounts(previousCount).faults;
+      const faults = getDisciplinaryCounts(count).faults;
+      const faultEvent: SessionState["events"] = faults < previousFaults ? [{ key: "eventFaultRemoved", values: { name, count: faults } }] : [];
+      return { ...current, warnings: { ...current.warnings, [participantId]: count }, events: [...faultEvent, { key: "eventWarningRemoved", values: { name, count } }, ...current.events] };
     });
+  }
+
+  function exportAttendance() {
+    const csv = buildAttendanceCsv({ committee, state, language });
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = attendanceCsvFilename(committee.slug, state.session.title);
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   }
 
   function selectCaucusMode(mode: CaucusMode) {
@@ -321,6 +348,12 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
         </div>
       </header>
 
+      <section className="session-identity-strip">
+        <span className="section-kicker">{t("sessionTitle")}</span>
+        <strong>{state.session.title || t("sessionTitle")}</strong>
+        {state.session.startedAt && <time dateTime={state.session.startedAt}>{new Intl.DateTimeFormat(language === "es" ? "es-MX" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(state.session.startedAt))}</time>}
+      </section>
+
       <section className={`session-topic-strip ${state.topic ? "topic-ready" : ""}`}>
         <span className="section-kicker">{t("topic")}</span>
         <strong>{state.topic || t("topicPending")}</strong>
@@ -361,13 +394,18 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
                   <div className="attendance-buttons" role="group" aria-label={t("attendanceFor", { name: representation.name })}>{attendanceValues.map((option) => <button key={option} type="button" aria-pressed={value === option} className={`attendance-button status-${option}`} onClick={() => update((current) => ({ ...current, attendance: { ...current.attendance, [representation.id]: option } }))}>{attendanceLabels[option]}</button>)}<button type="button" className="attendance-clear" disabled={value === "pending"} onClick={() => update((current) => ({ ...current, attendance: { ...current.attendance, [representation.id]: "pending" } }))}>{t("clear")}</button></div>
                 </article>;
               })}</div>
+              <section className="attendance-export-panel">
+                <div><span className="section-kicker">{t("attendanceReport")}</span><h3>{state.session.title || t("sessionTitle")}</h3><p>{t("attendanceReportHelp")}</p></div>
+                <button className="primary-button" type="button" onClick={exportAttendance}>{t("exportAttendanceCsv")}</button>
+              </section>
             </> : <div className="warnings-panel">
               <p className="module-note">{t("warningsIntro")}</p>
               <div className="warnings-list">{orderedParticipants.map((participant) => {
                 const count = state.warnings[participant.id] ?? 0;
+                const discipline = getDisciplinaryCounts(count);
                 return <article className="warning-row" key={participant.id}>
-                  <div className="attendance-person">{participant.flagUrl && <Image src={participant.flagUrl} alt="" width={32} height={22} unoptimized />}<span>{participant.name}</span>{count > 0 && <em>{t("warningCount", { count })}</em>}</div>
-                  <strong>{count}</strong>
+                  <div className="attendance-person">{participant.flagUrl && <Image src={participant.flagUrl} alt="" width={32} height={22} unoptimized />}<span>{participant.name}</span>{count > 0 && <em>{t("activeWarningCount", { count: discipline.activeWarnings })} · {t("faultCount", { count: discipline.faults })}</em>}</div>
+                  <div className="discipline-counts"><strong>{discipline.activeWarnings}</strong><span>{t("faultCount", { count: discipline.faults })}</span></div>
                   <div><button className="warning-add" onClick={() => addWarning(participant.id, participant.name)}>{t("addWarning")}</button><button disabled={count === 0} onClick={() => undoWarning(participant.id, participant.name)}>{t("undoWarning")}</button></div>
                 </article>;
               })}</div>
@@ -441,7 +479,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
             {state.finalVote.phase === "idle" && <div className="vote-start final-vote-start"><p>{t("finalVotingIntro")}</p><div className="final-topic-card"><span>{t("finalVoteTopic")}</span><strong>{state.topic}</strong></div><p>{t("eligibleCountries", { count: eligibleVoters.length })}</p><button className="primary-button" disabled={!state.topic || eligibleVoters.length === 0} onClick={beginFinalVote}>{t("startFinalVote", { count: eligibleVoters.length })}</button>{eligibleVoters.length === 0 && <button className="inline-link" onClick={() => setActiveTab("rollcall")}>{t("goToRollCall")}</button>}</div>}
             {(state.finalVote.phase === "round-one" || state.finalVote.phase === "round-two" || state.finalVote.phase === "round-three") && finalVoteParticipant && <div className="nominal-vote final-vote-stage">
               <div className="vote-progress">{t("roundProgress", { round: t(state.finalVote.phase === "round-one" ? "finalRoundOne" : state.finalVote.phase === "round-two" ? "finalRoundTwo" : "finalRoundThree"), current: state.finalVote.currentIndex + 1, total: state.finalVote.queue.length })}</div>
-              {finalVoteParticipant.flagUrl && <Image src={finalVoteParticipant.flagUrl} alt="" width={96} height={64} unoptimized />}<span>{t("castingVote")}</span><h2>{finalVoteParticipant.name}</h2><p>{state.finalVote.label}</p>{(state.warnings[finalVoteParticipant.id] ?? 0) > 0 && <strong className="warning-badge">{t("warningBadge", { count: state.warnings[finalVoteParticipant.id] })}</strong>}
+              {finalVoteParticipant.flagUrl && <Image src={finalVoteParticipant.flagUrl} alt="" width={96} height={64} unoptimized />}<span>{t("castingVote")}</span><h2>{finalVoteParticipant.name}</h2><p>{state.finalVote.label}</p>{(state.warnings[finalVoteParticipant.id] ?? 0) > 0 && <strong className="warning-badge">{disciplinaryLabel(state.warnings[finalVoteParticipant.id])}</strong>}
               <div className={`vote-actions final-vote-actions ${state.finalVote.phase === "round-two" ? "five-options" : ""}`}><button onClick={() => recordFinalVote("for")}>{t("inFavor")}</button><button onClick={() => recordFinalVote("against")}>{t("against")}</button>{state.finalVote.phase !== "round-three" && <button onClick={() => recordFinalVote("abstain")}>{t("abstention")}</button>}{state.finalVote.phase === "round-two" && <><button onClick={() => recordFinalVote("for-explanation")}>{t("forWithExplanation")}</button><button onClick={() => recordFinalVote("against-explanation")}>{t("againstWithExplanation")}</button></>}</div>
             </div>}
             {(state.finalVote.phase === "round-one-complete" || state.finalVote.phase === "round-two-complete" || state.finalVote.phase === "explanations-complete") && <div className="final-vote-transition">
@@ -451,8 +489,8 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
               <div className="stage-divider" aria-hidden="true"><span>✓</span><i /><span>{state.finalVote.phase === "round-one-complete" ? "2" : "3"}</span></div>
               <button className="primary-button" onClick={() => update((current) => ({ ...current, finalVote: advanceFinalVoteStage(current.finalVote) }))}>{t(state.finalVote.phase === "round-one-complete" ? "beginSecondRound" : state.finalVote.phase === "round-two-complete" && state.finalVote.explanationQueue.length > 0 ? "beginExplanations" : "beginThirdRound")}</button>
             </div>}
-            {state.finalVote.phase === "explanations" && finalVoteParticipant && <div className="nominal-vote explanation-stage"><div className="vote-progress">{t("explanationProgress", { current: state.finalVote.explanationIndex + 1, total: state.finalVote.explanationQueue.length })}</div>{finalVoteParticipant.flagUrl && <Image src={finalVoteParticipant.flagUrl} alt="" width={96} height={64} unoptimized />}<span>{t("explainingVote")}</span><h2>{finalVoteParticipant.name}</h2><p>{t(state.finalVote.roundTwo[finalVoteParticipant.id] === "for-explanation" ? "forWithExplanation" : "againstWithExplanation")}</p>{(state.warnings[finalVoteParticipant.id] ?? 0) > 0 && <strong className="warning-badge">{t("warningBadge", { count: state.warnings[finalVoteParticipant.id] })}</strong>}<button className="primary-button explanation-next" onClick={() => update((current) => ({ ...current, finalVote: advanceFinalVoteExplanation(current.finalVote) }))}>{t(state.finalVote.explanationIndex < state.finalVote.explanationQueue.length - 1 ? "nextExplanation" : "finishExplanations")}</button></div>}
-            {state.finalVote.phase === "complete" && <div className="vote-result final-vote-result"><span className="section-kicker">{t("finalVoteResult")}</span><h2>{state.finalVote.label}</h2><div className="vote-counts vote-counts-two"><div><strong>{finalVoteCounts.for}</strong><span>{t("inFavor")}</span></div><div><strong>{finalVoteCounts.against}</strong><span>{t("against")}</span></div></div><div className="final-vote-audit">{state.finalVote.queue.map((participantId) => { const participant = state.participants.find((item) => item.id === participantId); if (!participant) return null; const warnings = state.warnings[participantId] ?? 0; return <div key={participantId}><span>{participant.name}</span><strong>{t(state.finalVote.roundThree[participantId] === "for" ? "inFavor" : "against")}</strong>{warnings > 0 && <em>{t("warningBadge", { count: warnings })}</em>}</div>; })}</div><button onClick={() => update((current) => ({ ...current, finalVote: createInitialFinalVoteState() }))}>{t("resetFinalVote")}</button></div>}
+            {state.finalVote.phase === "explanations" && finalVoteParticipant && <div className="nominal-vote explanation-stage"><div className="vote-progress">{t("explanationProgress", { current: state.finalVote.explanationIndex + 1, total: state.finalVote.explanationQueue.length })}</div>{finalVoteParticipant.flagUrl && <Image src={finalVoteParticipant.flagUrl} alt="" width={96} height={64} unoptimized />}<span>{t("explainingVote")}</span><h2>{finalVoteParticipant.name}</h2><p>{t(state.finalVote.roundTwo[finalVoteParticipant.id] === "for-explanation" ? "forWithExplanation" : "againstWithExplanation")}</p>{(state.warnings[finalVoteParticipant.id] ?? 0) > 0 && <strong className="warning-badge">{disciplinaryLabel(state.warnings[finalVoteParticipant.id])}</strong>}<button className="primary-button explanation-next" onClick={() => update((current) => ({ ...current, finalVote: advanceFinalVoteExplanation(current.finalVote) }))}>{t(state.finalVote.explanationIndex < state.finalVote.explanationQueue.length - 1 ? "nextExplanation" : "finishExplanations")}</button></div>}
+            {state.finalVote.phase === "complete" && <div className="vote-result final-vote-result"><span className="section-kicker">{t("finalVoteResult")}</span><h2>{state.finalVote.label}</h2><div className="vote-counts vote-counts-two"><div><strong>{finalVoteCounts.for}</strong><span>{t("inFavor")}</span></div><div><strong>{finalVoteCounts.against}</strong><span>{t("against")}</span></div></div><div className="final-vote-audit">{state.finalVote.queue.map((participantId) => { const participant = state.participants.find((item) => item.id === participantId); if (!participant) return null; const warnings = state.warnings[participantId] ?? 0; return <div key={participantId}><span>{participant.name}</span><strong>{t(state.finalVote.roundThree[participantId] === "for" ? "inFavor" : "against")}</strong>{warnings > 0 && <em>{disciplinaryLabel(warnings)}</em>}</div>; })}</div><button onClick={() => update((current) => ({ ...current, finalVote: createInitialFinalVoteState() }))}>{t("resetFinalVote")}</button></div>}
           </section>
         )}
 

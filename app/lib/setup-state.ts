@@ -4,6 +4,8 @@ export type StoredSetup = {
   topic?: string;
   participants: Representation[];
   assignedParticipantIds?: string[];
+  sessionId?: string;
+  sessionTitle?: string;
   createdAt: string;
 };
 

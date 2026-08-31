@@ -3,7 +3,7 @@
 import Image from "next/image";
 import type { Committee } from "../lib/committees";
 import { useLocalCommitteeState } from "../hooks/useLocalCommitteeState";
-import { createInitialState } from "../lib/session-state";
+import { createInitialState, getDisciplinaryCounts } from "../lib/session-state";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useLanguage } from "./LanguageProvider";
 
@@ -29,6 +29,10 @@ export function ProjectorView({ committee, sessionKey }: { committee: Committee;
   const finalRoundKey = state.finalVote.phase === "round-one" ? "finalRoundOne" : state.finalVote.phase === "round-two" ? "finalRoundTwo" : "finalRoundThree";
   const secretariat = committee.slug.startsWith("lienzo-") ? t("blankCanvas") : committee.secretariat;
   const cssVars = { "--committee-color": committee.color, "--committee-dark": committee.darkColor } as React.CSSProperties;
+  const disciplinaryLabel = (totalWarnings: number) => {
+    const discipline = getDisciplinaryCounts(totalWarnings);
+    return t("disciplinaryBadge", { warnings: discipline.activeWarnings, faults: discipline.faults });
+  };
 
   return (
     <main className="projector-shell" style={cssVars}>
@@ -60,7 +64,7 @@ export function ProjectorView({ committee, sessionKey }: { committee: Committee;
             {finalParticipant.flagUrl && <Image src={finalParticipant.flagUrl} alt="" width={192} height={128} unoptimized priority />}
             <span className="projector-action">{t("explainingVote")}</span><h1>{finalParticipant.name}</h1>
             <strong className="projector-choice">{t(state.finalVote.roundTwo[finalParticipant.id] === "for-explanation" ? "forWithExplanation" : "againstWithExplanation")}</strong>
-            {(state.warnings[finalParticipant.id] ?? 0) > 0 && <span className="projector-warning">{t("warningBadge", { count: state.warnings[finalParticipant.id] })}</span>}
+            {(state.warnings[finalParticipant.id] ?? 0) > 0 && <span className="projector-warning">{disciplinaryLabel(state.warnings[finalParticipant.id])}</span>}
           </div>
         ) : (state.finalVote.phase === "round-one" || state.finalVote.phase === "round-two" || state.finalVote.phase === "round-three") && finalParticipant ? (
           <div className="projector-vote">
@@ -68,7 +72,7 @@ export function ProjectorView({ committee, sessionKey }: { committee: Committee;
             <p>{state.finalVote.label}</p>
             {finalParticipant.flagUrl && <Image src={finalParticipant.flagUrl} alt="" width={192} height={128} unoptimized priority />}
             <span className="projector-action">{t("castingVote")}</span><h1>{finalParticipant.name}</h1>
-            {(state.warnings[finalParticipant.id] ?? 0) > 0 && <span className="projector-warning">{t("warningBadge", { count: state.warnings[finalParticipant.id] })}</span>}
+            {(state.warnings[finalParticipant.id] ?? 0) > 0 && <span className="projector-warning">{disciplinaryLabel(state.warnings[finalParticipant.id])}</span>}
           </div>
         ) : state.finalVote.phase === "complete" ? (
           <div className="projector-result">

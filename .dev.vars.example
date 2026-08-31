@@ -1,0 +1,3 @@
+ACCESS_MODE=protected
+ACCESS_PIN=replace-with-a-strong-shared-password
+ACCESS_SESSION_SECRET=replace-with-at-least-32-random-characters

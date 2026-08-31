@@ -28,6 +28,11 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
           const setupState = createInitialState(setup.participants);
           setState({
             ...setupState,
+            session: {
+              id: setup.sessionId ?? crypto.randomUUID(),
+              title: setup.sessionTitle ?? "",
+              startedAt: setup.createdAt || new Date().toISOString(),
+            },
             topic: setup.topic ?? "",
             assignedParticipantIds: setup.assignedParticipantIds ?? setup.participants.map((participant) => participant.id),
           });

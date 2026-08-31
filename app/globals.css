@@ -26,6 +26,17 @@ h1, h2 { font-family: var(--font-playfair), serif; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid color-mix(in srgb, var(--committee-color), white 35%); outline-offset: 2px; }
 
 .landing-shell { min-height: 100vh; background: var(--paper); padding: 0 clamp(1rem, 4vw, 4.5rem) 2rem; }
+.access-shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; padding: 0 clamp(1rem, 4vw, 4.5rem); background: radial-gradient(circle at 80% 20%, #c2943d18, transparent 32%), var(--paper); }
+.access-header { min-height: 82px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--line); }
+.access-card { width: min(560px, 100%); align-self: center; margin: clamp(3rem, 8vh, 7rem) auto; padding: clamp(1.5rem, 5vw, 3.5rem); border: 1px solid var(--line); background: white; box-shadow: 0 28px 80px #0e1b1712; }
+.access-card h1 { margin: .65rem 0 1rem; font-size: clamp(2.6rem, 7vw, 4.8rem); font-weight: 500; line-height: .95; }
+.access-card > p { color: var(--muted); line-height: 1.65; }
+.access-card form { display: grid; gap: .7rem; margin-top: 2rem; }
+.access-card label { color: var(--muted); font-size: .72rem; font-weight: 800; }
+.access-card input { min-height: 52px; padding: 0 .9rem; border: 1px solid var(--line); background: var(--paper); }
+.access-card button { min-height: 52px; margin-top: .35rem; }
+.access-card button:disabled { cursor: not-allowed; opacity: .5; }
+.access-error { margin: 0; color: var(--danger); font-size: .76rem; font-weight: 750; }
 .landing-header, .console-header { min-height: 82px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--line); }
 .brand-lockup, .console-brand { display: flex; align-items: center; gap: .8rem; }
 .brand-lockup > div { display: grid; gap: .1rem; }
@@ -214,6 +225,9 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .projector-idle p { margin-top: 2rem; color: #ffffffaa; font-size: clamp(1rem, 2vw, 1.5rem); }
 
 .session-topic-strip { min-height: 64px; display: flex; align-items: center; gap: 1rem; padding: .75rem clamp(1rem, 3vw, 3rem); background: #f3e9d0; border-bottom: 1px solid #dfcfa8; }
+.session-identity-strip { min-height: 48px; display: flex; align-items: center; gap: 1rem; padding: .6rem clamp(1rem, 3vw, 3rem); background: white; border-bottom: 1px solid var(--line); }
+.session-identity-strip strong { font-family: var(--font-playfair), serif; font-size: 1rem; }
+.session-identity-strip time { margin-left: auto; color: var(--muted); font-size: .68rem; }
 .session-topic-strip.topic-ready { background: color-mix(in srgb, var(--committee-color) 9%, white); border-color: color-mix(in srgb, var(--committee-color), white 65%); }
 .session-topic-strip strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-playfair), serif; }
 .rollcall-module { display: flex; flex-direction: column; }
@@ -237,6 +251,10 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .attendance-button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px currentColor; }
 .attendance-clear { border-color: transparent; background: transparent; color: var(--muted); }
 .attendance-clear:disabled { cursor: default; opacity: .25; }
+.attendance-export-panel { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-top: 1.5rem; padding: 1.25rem; border: 1px solid color-mix(in srgb, var(--committee-color), white 65%); background: color-mix(in srgb, var(--committee-color) 7%, white); }
+.attendance-export-panel h3 { margin: .3rem 0; font-family: var(--font-playfair), serif; font-size: 1.25rem; }
+.attendance-export-panel p { margin: 0; color: var(--muted); font-size: .74rem; }
+.attendance-export-panel button { min-height: 48px; flex: 0 0 auto; }
 
 .speaker-queue li { grid-template-columns: 44px 28px 1fr auto; padding: .35rem 0; background: white; }
 .speaker-queue li.is-dragging { z-index: 3; box-shadow: 0 10px 30px #0e1b1726; opacity: .92; }
@@ -261,7 +279,9 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .caucus-mode-hint { margin: .75rem 0 -1rem; color: #ffffffa8; font-size: .78rem; }
 .warnings-list { border-top: 1px solid var(--line); }
 .warning-row { min-height: 66px; display: grid; grid-template-columns: 1fr 48px auto; align-items: center; gap: 1rem; padding: .55rem .5rem; border-bottom: 1px solid var(--line); }
-.warning-row > strong { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; background: var(--paper); color: var(--danger); font-family: var(--font-playfair), serif; font-size: 1.15rem; }
+.discipline-counts { display: grid; justify-items: center; gap: .2rem; }
+.discipline-counts strong { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; background: var(--paper); color: var(--danger); font-family: var(--font-playfair), serif; font-size: 1.15rem; }
+.discipline-counts span { color: var(--danger); font-size: .58rem; font-weight: 850; white-space: nowrap; }
 .warning-row > div:last-child { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .45rem; }
 .warning-row button { min-height: 42px; padding: 0 .75rem; border: 1px solid var(--line); background: white; color: var(--muted); font-size: .68rem; font-weight: 800; }
 .warning-row button.warning-add { border-color: var(--danger); background: #f4d9d6; color: var(--danger); }
@@ -304,6 +324,9 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .setup-grid { display: grid; grid-template-columns: minmax(270px, .72fr) minmax(480px, 1.28fr); gap: 1px; margin: 0 clamp(1rem, 4vw, 4rem); background: var(--line); border: 1px solid var(--line); }
 .setup-grid.setup-grid-single { display: block; max-width: none; margin-inline: clamp(1rem, 4vw, 4rem); background: white; }
 .setup-panel { padding: clamp(1.25rem, 3vw, 2.5rem); background: white; }
+.session-title-field { margin-bottom: 2rem; padding: 1.2rem; border-left: 4px solid var(--committee-color); background: color-mix(in srgb, var(--committee-color) 7%, white); }
+.session-title-field input { margin-top: .45rem; background: white; }
+.session-title-field p { margin: .5rem 0 0; color: var(--muted); font-size: .7rem; }
 .setup-panel h2 { margin: .35rem 0 1.5rem; font-size: 1.75rem; font-weight: 550; }
 .setup-panel label { display: grid; gap: .45rem; color: var(--muted); font-size: .73rem; font-weight: 750; }
 .setup-panel select, .setup-panel input { width: 100%; min-height: 44px; padding: 0 .8rem; border: 1px solid var(--line); background: var(--paper); color: var(--itam-ink); }
@@ -393,6 +416,10 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
   .warning-row > div:last-child { display: grid; grid-template-columns: 1fr 1fr; }
   .final-vote-audit > div { grid-template-columns: 1fr auto; }
   .final-vote-audit em { grid-column: 1 / -1; }
+  .session-identity-strip { align-items: flex-start; flex-direction: column; gap: .2rem; }
+  .session-identity-strip time { margin-left: 0; }
+  .attendance-export-panel { align-items: stretch; flex-direction: column; }
+  .attendance-export-panel button { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -18,6 +18,7 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
   const [customParticipants, setCustomParticipants] = useState<Representation[]>([]);
   const [customName, setCustomName] = useState("");
   const [search, setSearch] = useState("");
+  const [sessionTitle, setSessionTitle] = useState("");
   const { language, t } = useLanguage();
 
   const visible = useMemo(() => detail.representations.filter((item) => item.name.toLocaleLowerCase(language).includes(search.toLocaleLowerCase(language))), [detail.representations, language, search]);
@@ -41,8 +42,15 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
   }
 
   function startSession() {
-    if (participants.length === 0) return;
-    const setup: StoredSetup = { participants, assignedParticipantIds, createdAt: new Date().toISOString() };
+    const title = sessionTitle.trim();
+    if (participants.length === 0 || !title) return;
+    const setup: StoredSetup = {
+      participants,
+      assignedParticipantIds,
+      sessionId: crypto.randomUUID(),
+      sessionTitle: title,
+      createdAt: new Date().toISOString(),
+    };
     window.localStorage.setItem(setupStorageKey(sessionKey), JSON.stringify(setup));
     window.localStorage.removeItem(`itammun:session:${sessionKey}`);
     window.location.assign(`/comite/${sessionKey}?nombre=${encodeURIComponent(committee.name)}`);
@@ -66,6 +74,11 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
 
       <div className="setup-grid setup-grid-single">
         <section className="setup-panel participants-panel">
+          <div className="session-title-field">
+            <label htmlFor="session-title">{t("sessionTitle")}</label>
+            <input id="session-title" value={sessionTitle} onChange={(event) => setSessionTitle(event.target.value)} placeholder={t("sessionTitlePlaceholder")} autoFocus />
+            <p>{t("sessionTitleHelp")}</p>
+          </div>
           <div className="setup-panel-heading"><div><span className="section-kicker">{t("countriesAndPeople")}</span><h2>{t("initialSeats")}</h2></div><strong>{assignedParticipantIds.length}</strong></div>
           {detail.representations.length > 0 && (
             <>
@@ -96,7 +109,7 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
 
       <footer className="setup-footer">
         <div><strong>{t("initialSeatsCount", { count: assignedParticipantIds.length })}</strong><span>{t("availableParticipantsCount", { count: participants.length })}</span></div>
-        <button className="primary-button" disabled={participants.length === 0} onClick={startSession}>{t("startSession")}</button>
+        <button className="primary-button" disabled={participants.length === 0 || !sessionTitle.trim()} onClick={startSession}>{t("startSession")}</button>
       </footer>
     </main>
   );
