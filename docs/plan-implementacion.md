@@ -344,3 +344,13 @@ Decisiones confirmadas para esta versión:
 - el tópico existente es la materia de la votación final;
 - la votación iniciada no cambia por modificaciones posteriores de asistencia;
 - el estado local anterior se migra a la versión 3 sin perder tópico, asistencia, colas, caucus ni apelaciones.
+
+## Iteración 4 — asistencia exportable y acceso general
+
+- Setup exige un título para distinguir las sesiones celebradas durante varios días.
+- Cada sesión guarda UUID, título y fecha de inicio en el estado local versión 4.
+- Pase de lista exporta un CSV UTF-8 con todos los países, estados, cupos, observadores, llamadas acumuladas y faltas.
+- Cada tres llamadas de atención se convierten en una falta; el residuo permanece como warnings activos.
+- Todo el sitio queda detrás de una contraseña general validada por el Worker mediante secretos de hosting.
+- `ACCESS_MODE=public` permite publicar la aplicación después del evento sin eliminar la puerta de acceso del código.
+- La persistencia central queda fuera de esta iteración; D1 o Node/PostgreSQL podrán consumir posteriormente el mismo modelo de sesión.
