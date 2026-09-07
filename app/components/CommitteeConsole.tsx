@@ -8,6 +8,7 @@ import { features } from "../lib/features";
 import { representationFullName, representationPrimaryName, representationSecondaryName, topicDisplayTitle, type CommitteeDetail, type CommitteeTopic } from "../lib/itammun-api";
 import { useLocalCommitteeState } from "../hooks/useLocalCommitteeState";
 import { attendanceCsvFilename, buildAttendanceCsv } from "../lib/attendance-csv";
+import { selectedParticipants } from "../lib/participant-selection";
 import {
   advanceFinalVoteExplanation,
   advanceFinalVoteStage,
@@ -40,7 +41,10 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
   sessionKey: string;
 }) {
   const { language, t } = useLanguage();
-  const { state, update, closeSession } = useLocalCommitteeState(sessionKey, createInitialState(detail.representations));
+  const { state, update, closeSession } = useLocalCommitteeState(
+    sessionKey,
+    createInitialState(selectedParticipants(detail.representations, detail.initiallyAssignedRepresentationIds)),
+  );
   const [activeTab, setActiveTab] = useState<ConsoleTab>("rollcall");
   const [rollCallView, setRollCallView] = useState<"attendance" | "warnings">("attendance");
   const [speakerView, setSpeakerView] = useState<"list" | "questions">("list");

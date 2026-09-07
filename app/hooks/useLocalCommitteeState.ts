@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeSessionState } from "../lib/session-migration";
 import { createInitialState, type SessionState } from "../lib/session-state";
+import { selectedParticipants } from "../lib/participant-selection";
 import { setupStorageKey, type StoredSetup } from "../lib/setup-state";
 
 export function sessionStorageKey(sessionKey: string) {
@@ -26,7 +27,8 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
       if (rawSetup) {
         try {
           const setup = JSON.parse(rawSetup) as StoredSetup;
-          const setupState = createInitialState(setup.participants);
+          const assignedParticipantIds = setup.assignedParticipantIds ?? setup.participants.map((participant) => participant.id);
+          const setupState = createInitialState(selectedParticipants(setup.participants, assignedParticipantIds));
           setState({
             ...setupState,
             session: {
@@ -35,7 +37,7 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
               startedAt: setup.createdAt || new Date().toISOString(),
             },
             topic: setup.topic ?? "",
-            assignedParticipantIds: setup.assignedParticipantIds ?? setup.participants.map((participant) => participant.id),
+            assignedParticipantIds,
           });
         } catch { /* keep the empty initial state */ }
       }

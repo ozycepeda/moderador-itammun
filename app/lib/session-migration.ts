@@ -1,4 +1,5 @@
 import { isTranslationKey } from "./i18n";
+import { selectedParticipants } from "./participant-selection";
 import {
   createInitialFinalVoteState,
   type AttendanceStatus,
@@ -35,16 +36,23 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
   if (!value || typeof value !== "object") return fallback;
   const stored = value as Partial<SessionState> & { caucusDuration?: number; caucusExtension?: number };
   const storedParticipants = Array.isArray(stored.participants) ? stored.participants : [];
-  const participants = [
+  const participantPool = [
     ...fallback.participants,
     ...storedParticipants.filter((storedParticipant) => !fallback.participants.some((participant) => participant.id === storedParticipant.id)),
   ];
+  const assignedParticipantIds = Array.isArray(stored.assignedParticipantIds)
+    ? stored.assignedParticipantIds.filter((id): id is string => typeof id === "string")
+    : storedParticipants.map((participant) => participant.id);
+  const participants = selectedParticipants(participantPool, assignedParticipantIds);
+  const activeParticipantIds = new Set(participants.map((participant) => participant.id));
   const storedAttendance = stored.attendance ?? {};
   const attendance = Object.fromEntries(participants.map((participant) => [
     participant.id,
     storedAttendance[participant.id] ?? (participant.observer ? "observer" : "pending"),
   ])) as Record<string, AttendanceStatus>;
-  const ballots = Object.fromEntries(Object.entries(stored.vote?.ballots ?? {}).filter((entry): entry is [string, VoteChoice] => entry[1] === "for" || entry[1] === "against"));
+  const ballots = Object.fromEntries(Object.entries(stored.vote?.ballots ?? {}).filter((entry): entry is [string, VoteChoice] => (
+    activeParticipantIds.has(entry[0]) && (entry[1] === "for" || entry[1] === "against")
+  )));
   const rawEvents = Array.isArray(stored.events) ? stored.events as unknown[] : [];
   const events = rawEvents.flatMap((event): Array<string | SessionEvent> => {
     if (typeof event === "string") return [event];
@@ -57,19 +65,34 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
   const initialFinalVote = createInitialFinalVoteState();
   const validRoundOne = new Set<FinalVoteRoundOneChoice>(["for", "against", "abstain"]);
   const validRoundTwo = new Set<FinalVoteRoundTwoChoice>(["for", "against", "abstain", "for-explanation", "against-explanation"]);
+  const finalVoteQueue = Array.isArray(storedFinalVote?.queue)
+    ? storedFinalVote.queue.filter((id): id is string => typeof id === "string" && activeParticipantIds.has(id))
+    : [];
+  const explanationQueue = Array.isArray(storedFinalVote?.explanationQueue)
+    ? storedFinalVote.explanationQueue.filter((id): id is string => typeof id === "string" && activeParticipantIds.has(id))
+    : [];
   const finalVote = storedFinalVote ? {
     ...initialFinalVote,
     ...storedFinalVote,
-    queue: Array.isArray(storedFinalVote.queue) ? storedFinalVote.queue : [],
-    roundOne: Object.fromEntries(Object.entries(storedFinalVote.roundOne ?? {}).filter((entry): entry is [string, FinalVoteRoundOneChoice] => validRoundOne.has(entry[1]))),
-    roundTwo: Object.fromEntries(Object.entries(storedFinalVote.roundTwo ?? {}).filter((entry): entry is [string, FinalVoteRoundTwoChoice] => validRoundTwo.has(entry[1]))),
-    roundThree: Object.fromEntries(Object.entries(storedFinalVote.roundThree ?? {}).filter((entry): entry is [string, VoteChoice] => entry[1] === "for" || entry[1] === "against")),
-    explanationQueue: Array.isArray(storedFinalVote.explanationQueue) ? storedFinalVote.explanationQueue : [],
+    queue: finalVoteQueue,
+    currentIndex: Math.min(storedFinalVote.currentIndex ?? 0, Math.max(0, finalVoteQueue.length - 1)),
+    phase: finalVoteQueue.length === 0 ? "idle" as const : storedFinalVote.phase,
+    roundOne: Object.fromEntries(Object.entries(storedFinalVote.roundOne ?? {}).filter((entry): entry is [string, FinalVoteRoundOneChoice] => activeParticipantIds.has(entry[0]) && validRoundOne.has(entry[1]))),
+    roundTwo: Object.fromEntries(Object.entries(storedFinalVote.roundTwo ?? {}).filter((entry): entry is [string, FinalVoteRoundTwoChoice] => activeParticipantIds.has(entry[0]) && validRoundTwo.has(entry[1]))),
+    roundThree: Object.fromEntries(Object.entries(storedFinalVote.roundThree ?? {}).filter((entry): entry is [string, VoteChoice] => activeParticipantIds.has(entry[0]) && (entry[1] === "for" || entry[1] === "against"))),
+    explanationQueue,
+    explanationIndex: Math.min(storedFinalVote.explanationIndex ?? 0, Math.max(0, explanationQueue.length - 1)),
   } : initialFinalVote;
   const moderatedDuration = stored.caucuses?.moderated?.duration ?? stored.caucusDuration ?? fallback.caucuses.moderated.duration;
   const moderatedExtension = stored.caucuses?.moderated?.extension ?? stored.caucusExtension ?? Math.max(0, moderatedDuration - 1);
   const storedSession = stored.session;
   const validYields = new Set<SpeakerYieldDestination>(["none", "chair", "next", "questions"]);
+  const currentSpeakerParticipantId = typeof stored.currentSpeakerParticipantId === "string" && activeParticipantIds.has(stored.currentSpeakerParticipantId)
+    ? stored.currentSpeakerParticipantId
+    : participants.find((participant) => participant.name === stored.currentSpeaker)?.id ?? "";
+  const currentQuestionerParticipantId = typeof stored.currentQuestionerParticipantId === "string" && activeParticipantIds.has(stored.currentQuestionerParticipantId)
+    ? stored.currentQuestionerParticipantId
+    : participants.find((participant) => participant.name === stored.currentQuestioner)?.id ?? "";
   const session = storedSession && typeof storedSession === "object"
     ? {
         id: typeof storedSession.id === "string" && storedSession.id ? storedSession.id : crypto.randomUUID(),
@@ -92,18 +115,19 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
       ? stored.topicByLanguage
       : undefined,
     participants,
-    assignedParticipantIds: stored.assignedParticipantIds ?? storedParticipants.map((participant) => participant.id),
+    assignedParticipantIds,
     attendance,
-    speakers: normalizeQueue(stored.speakers, participants),
-    questionQueue: normalizeQueue(stored.questionQueue, participants),
-    currentQuestionerParticipantId: typeof stored.currentQuestionerParticipantId === "string"
-      ? stored.currentQuestionerParticipantId
-      : participants.find((participant) => participant.name === stored.currentQuestioner)?.id ?? "",
-    currentSpeakerYield: validYields.has(stored.currentSpeakerYield as SpeakerYieldDestination)
+    speakers: normalizeQueue(stored.speakers, participants).filter((item) => Boolean(item.participantId && activeParticipantIds.has(item.participantId))),
+    currentSpeaker: currentSpeakerParticipantId && typeof stored.currentSpeaker === "string" ? stored.currentSpeaker : "",
+    currentSpeakerParticipantId,
+    questionQueue: normalizeQueue(stored.questionQueue, participants).filter((item) => Boolean(item.participantId && activeParticipantIds.has(item.participantId))),
+    currentQuestioner: currentQuestionerParticipantId && typeof stored.currentQuestioner === "string" ? stored.currentQuestioner : "",
+    currentQuestionerParticipantId,
+    currentSpeakerYield: currentSpeakerParticipantId && validYields.has(stored.currentSpeakerYield as SpeakerYieldDestination)
       ? stored.currentSpeakerYield as SpeakerYieldDestination
       : "none",
-    pendingDonationSeconds: typeof stored.pendingDonationSeconds === "number" ? Math.max(0, stored.pendingDonationSeconds) : 0,
-    warnings: Object.fromEntries(Object.entries(stored.warnings ?? {}).filter((entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] >= 0)),
+    pendingDonationSeconds: currentSpeakerParticipantId && typeof stored.pendingDonationSeconds === "number" ? Math.max(0, stored.pendingDonationSeconds) : 0,
+    warnings: Object.fromEntries(Object.entries(stored.warnings ?? {}).filter((entry): entry is [string, number] => activeParticipantIds.has(entry[0]) && typeof entry[1] === "number" && entry[1] >= 0)),
     caucuses: {
       moderated: { duration: moderatedDuration, extension: moderatedExtension },
       simple: {
@@ -113,7 +137,13 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
     },
     appeals: stored.appeals ?? fallback.appeals,
     events: rawEvents.length > 0 ? events : fallback.events,
-    vote: { ...fallback.vote, ...stored.vote, context: "appeal", ballots },
+    vote: {
+      ...fallback.vote,
+      ...stored.vote,
+      context: "appeal",
+      queue: (stored.vote?.queue ?? []).filter((id) => activeParticipantIds.has(id)),
+      ballots,
+    },
     finalVote,
   };
 }

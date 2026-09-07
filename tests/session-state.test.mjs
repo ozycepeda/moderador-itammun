@@ -13,6 +13,7 @@ import {
   startFinalVote,
 } from "../app/lib/session-state.ts";
 import { normalizeSessionState } from "../app/lib/session-migration.ts";
+import { selectedParticipants } from "../app/lib/participant-selection.ts";
 
 test("moves every eligible voter through all three final-vote rounds", () => {
   let vote = startFinalVote("Tópico de prueba", ["mx", "fr"]);
@@ -94,6 +95,53 @@ test("preselects only occupied catalog representations", () => {
     { id: "available", name: "Disponible", observer: false, status: "available" },
   ]);
   assert.deepEqual(state.assignedParticipantIds, ["paid"]);
+});
+
+test("passes only checked setup participants into the debate", () => {
+  const catalog = [
+    { id: "checked", name: "Seleccionado", observer: false, status: "occupied" },
+    { id: "unchecked", name: "No seleccionado", observer: false, status: "available" },
+    { id: "manual", name: "Agregado manualmente", observer: false, status: "occupied" },
+  ];
+  assert.deepEqual(
+    selectedParticipants(catalog, ["checked", "manual"]).map((participant) => participant.id),
+    ["checked", "manual"],
+  );
+});
+
+test("removes unchecked participants from sessions saved before the setup fix", () => {
+  const catalog = [
+    { id: "checked", name: "Seleccionado", observer: false, status: "occupied" },
+    { id: "unchecked", name: "No seleccionado", observer: false, status: "available" },
+  ];
+  const fallback = createInitialState(catalog);
+  const migrated = normalizeSessionState({
+    ...fallback,
+    participants: catalog,
+    assignedParticipantIds: ["checked"],
+    attendance: { checked: "present", unchecked: "present-voting" },
+    speakers: [
+      { id: "speaker-checked", participantId: "checked", name: "Seleccionado" },
+      { id: "speaker-unchecked", participantId: "unchecked", name: "No seleccionado" },
+    ],
+    currentSpeaker: "No seleccionado",
+    currentSpeakerParticipantId: "unchecked",
+    warnings: { checked: 1, unchecked: 2 },
+    finalVote: {
+      ...fallback.finalVote,
+      phase: "round-one",
+      queue: ["checked", "unchecked"],
+      roundOne: { checked: "for", unchecked: "against" },
+    },
+  }, fallback);
+
+  assert.deepEqual(migrated.participants.map((participant) => participant.id), ["checked"]);
+  assert.deepEqual(migrated.attendance, { checked: "present" });
+  assert.deepEqual(migrated.speakers.map((speaker) => speaker.participantId), ["checked"]);
+  assert.equal(migrated.currentSpeaker, "");
+  assert.deepEqual(migrated.warnings, { checked: 1 });
+  assert.deepEqual(migrated.finalVote.queue, ["checked"]);
+  assert.deepEqual(migrated.finalVote.roundOne, { checked: "for" });
 });
 
 test("keeps the current speaker visible after yielding and advances only on request", () => {

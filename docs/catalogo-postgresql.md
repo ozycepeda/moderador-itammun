@@ -8,7 +8,7 @@ Moderador no se conecta a phpMyAdmin ni directamente a una base de datos. El ser
 GET https://itammun.itam.mx/api/public/debates/<uuid-del-comité>
 ```
 
-Los UUID oficiales viven en `app/lib/committees.ts`. `app/lib/itammun-api.ts` valida y normaliza la respuesta. El setup utiliza `status=occupied` para marcar únicamente los cupos pagados; `available` permanece visible pero sin marcar. El estado del debate nunca se escribe en ese API.
+Los UUID oficiales viven en `app/lib/committees.ts`. `app/lib/itammun-api.ts` valida y normaliza la respuesta. El setup utiliza `status=occupied` para marcar únicamente los cupos pagados; `available` permanece visible pero sin marcar. Al iniciar, sólo las representaciones con palomita se copian a la sesión local y, por tanto, al pase de lista, amonestaciones, colas, votaciones y CSV. El estado del debate nunca se escribe en ese API.
 
 Para cambiar el origen sin modificar código:
 

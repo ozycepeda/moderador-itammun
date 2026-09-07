@@ -7,7 +7,7 @@ Prototipo funcional para preparar y conducir debates de ITAMMUN. El catálogo de
 - Acceso general protegido por una contraseña compartida, sin cuentas individuales.
 - Inicio con diez comités y lienzo en blanco.
 - Interfaz completa en español e inglés con preferencia persistente entre páginas y pestañas.
-- Setup obligatorio con título de sesión; sólo los cupos `occupied` llegan preseleccionados y el catálogo completo permanece disponible.
+- Setup obligatorio con título de sesión; sólo los cupos `occupied` llegan preseleccionados y el catálogo completo permanece disponible durante la preparación. Únicamente las representaciones marcadas pasan al debate, pase de lista y CSV.
 - Pase de lista siempre editable con botones de estado; después se elige o crea el tópico.
 - Lista de oradores limitada a participantes en sala y reordenable. El orador puede ceder a preguntas y respuestas, a la Mesa o al siguiente turno.
 - Preguntas y respuestas ordinarias usan el remanente del orador; la sesión extraordinaria mantiene una cola independiente sin cronómetro.

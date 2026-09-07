@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { committeeDisplayAbbreviation, committeeDisplaySecretariat, type Committee } from "../lib/committees";
 import { representationFullName, representationMatches, representationSecondaryName, type CommitteeDetail, type Representation } from "../lib/itammun-api";
+import { selectedParticipants } from "../lib/participant-selection";
 import { setupStorageKey, type StoredSetup } from "../lib/setup-state";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useLanguage } from "./LanguageProvider";
@@ -52,9 +53,10 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
 
   function startSession() {
     const title = sessionTitle.trim();
-    if (participants.length === 0 || !title) return;
+    const activeParticipants = selectedParticipants(participants, assignedParticipantIds);
+    if (activeParticipants.length === 0 || !title) return;
     const setup: StoredSetup = {
-      participants,
+      participants: activeParticipants,
       assignedParticipantIds,
       sessionId: crypto.randomUUID(),
       sessionTitle: title,
@@ -121,7 +123,7 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
 
       <footer className="setup-footer">
         <div><strong>{t("initialSeatsCount", { count: assignedParticipantIds.length })}</strong><span>{t("availableParticipantsCount", { count: participants.length })}</span></div>
-        <button className="primary-button" disabled={participants.length === 0 || !sessionTitle.trim()} onClick={startSession}>{t("startSession")}</button>
+        <button className="primary-button" disabled={assignedParticipantIds.length === 0 || !sessionTitle.trim()} onClick={startSession}>{t("startSession")}</button>
       </footer>
     </main>
   );
