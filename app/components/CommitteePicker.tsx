@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { committeeDisplayAbbreviation, committeeDisplayName, committeeDisplaySecretariat, type Committee } from "../lib/committees";
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -22,7 +23,7 @@ export function CommitteePicker({ committees }: { committees: Committee[] }) {
           <span className="brand-mark">I</span>
           <div><strong>ITAMMUN</strong><span>{t("moderator")}</span></div>
         </div>
-        <div className="landing-actions"><span className="open-access">{t("openAccess")}</span><LanguageSwitcher /></div>
+        <div className="landing-actions"><Link className="ledger-link" href="/admin/asistencia">{t("attendanceLedger")}</Link><span className="open-access">{t("openAccess")}</span><LanguageSwitcher /></div>
       </header>
 
       <section className="landing-intro">

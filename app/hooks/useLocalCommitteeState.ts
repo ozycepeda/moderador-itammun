@@ -84,5 +84,5 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
     window.localStorage.removeItem(setupStorageKey(sessionKey));
   }, [sessionKey]);
 
-  return { state, update, closeSession };
+  return { state, update, closeSession, hydrated };
 }

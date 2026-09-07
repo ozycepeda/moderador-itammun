@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { committeeDisplayAbbreviation, committeeDisplayName, committeeDisplaySecretariat, type Committee } from "../lib/committees";
 import { features } from "../lib/features";
 import { representationFullName, representationPrimaryName, representationSecondaryName, topicDisplayTitle, type CommitteeDetail, type CommitteeTopic } from "../lib/itammun-api";
 import { useLocalCommitteeState } from "../hooks/useLocalCommitteeState";
 import { attendanceCsvFilename, buildAttendanceCsv } from "../lib/attendance-csv";
+import { buildAttendanceClosePayload } from "../lib/attendance-submission";
 import { selectedParticipants } from "../lib/participant-selection";
 import {
   advanceFinalVoteExplanation,
@@ -41,7 +42,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
   sessionKey: string;
 }) {
   const { language, t } = useLanguage();
-  const { state, update, closeSession } = useLocalCommitteeState(
+  const { state, update, closeSession, hydrated } = useLocalCommitteeState(
     sessionKey,
     createInitialState(selectedParticipants(detail.representations, detail.initiallyAssignedRepresentationIds)),
   );
@@ -60,6 +61,9 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
   const [caucusRunning, setCaucusRunning] = useState(false);
   const [appealAppellant, setAppealAppellant] = useState("");
   const [appealRuling, setAppealRuling] = useState("");
+  const [closeStatus, setCloseStatus] = useState<"idle" | "saving" | "error">("idle");
+  const [closeError, setCloseError] = useState<"generic" | "conflict" | null>(null);
+  const closeTimestampRef = useRef<string | null>(null);
 
   const tabLabels: Record<ConsoleTab, string> = {
     rollcall: t("rollCall"), speakers: t("speakers"), caucus: t("caucusAndExtensions"),
@@ -300,12 +304,35 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
     URL.revokeObjectURL(url);
   }
 
-  function finishSession() {
+  async function finishSession() {
+    if (!hydrated || !state.session.id || !state.session.title || closeStatus === "saving") return;
     if (!window.confirm(t("finishSessionConfirm"))) return;
-    exportAttendance();
-    closeSession();
-    window.alert(t("sessionClosedSuccess"));
-    window.location.replace("/");
+    setCloseStatus("saving");
+    setCloseError(null);
+    try {
+      closeTimestampRef.current ??= new Date().toISOString();
+      const payload = buildAttendanceClosePayload({ committee, state, closedAt: closeTimestampRef.current });
+      const response = await fetch(`/api/attendance/sessions/${encodeURIComponent(state.session.id)}/close`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json() as { ok?: boolean; error?: string; receiptId?: string };
+      if (!response.ok || result.ok !== true) {
+        exportAttendance();
+        setCloseStatus("error");
+        setCloseError(result.error === "session-conflict" ? "conflict" : "generic");
+        return;
+      }
+      exportAttendance();
+      closeSession();
+      window.alert(t("sessionClosedSuccessReceipt", { receipt: result.receiptId ?? state.session.id }));
+      window.location.replace("/");
+    } catch {
+      exportAttendance();
+      setCloseStatus("error");
+      setCloseError("generic");
+    }
   }
 
   function selectCaucusMode(mode: CaucusMode) {
@@ -401,7 +428,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
         <div className="committee-heading"><span>{secretariat}</span><h1>{abbreviation}</h1></div>
         <div className="sharing-tools">
           <span className="sync-state sync-local">{t("savedLocally")}</span>
-          <button className="secondary-button finish-session-button" onClick={finishSession}>{t("finishSession")}</button>
+          <button className="secondary-button finish-session-button" disabled={!hydrated || !state.session.id || !state.session.title || closeStatus === "saving"} onClick={finishSession}>{t(closeStatus === "saving" ? "savingAttendance" : "finishSession")}</button>
           <a className="secondary-button" href={`/comite/${sessionKey}/pantalla?nombre=${encodeURIComponent(committeeName)}`} target="_blank" rel="noreferrer">{t("screen")}</a>
           <button className="secondary-button share-button" onClick={share}>{t(copied ? "linkCopied" : "share")}</button>
           <LanguageSwitcher dark />
@@ -412,6 +439,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
         <span className="section-kicker">{t("sessionTitle")}</span>
         <strong>{state.session.title || t("sessionTitle")}</strong>
         {state.session.startedAt && <time dateTime={state.session.startedAt}>{new Intl.DateTimeFormat(language === "es" ? "es-MX" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(state.session.startedAt))}</time>}
+        {closeStatus === "error" && <p className="attendance-save-error" role="alert">{t(closeError === "conflict" ? "attendanceConflict" : "attendanceSaveError")}</p>}
       </section>
 
       <section className={`session-topic-strip ${state.topic ? "topic-ready" : ""}`}>
