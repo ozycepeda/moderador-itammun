@@ -1,3 +1,6 @@
+import type { LocalizedText } from "./catalog-translations";
+import type { Language } from "./i18n";
+
 export type Committee = {
   id: string;
   slug: string;
@@ -18,7 +21,7 @@ export type Committee = {
 // sql/001_catalog_test.sql los guarda como configuración del moderador.
 export const committees: Committee[] = [
   { id: "27c2f7cf-0188-4733-b8f1-2406c4313e52", slug: "onu-mujeres", abbreviation: "ONU Mujeres", name: "ONU Mujeres", language: "ES", level: "Bajo", representationType: "delegacion", representationsCount: 25, secretariat: "Asuntos Humanitarios", color: "#3C98A5", darkColor: "#1A3A3E" },
-  { id: "eb2c6702-122d-4e3f-bae5-185731081340", slug: "acnur", abbreviation: "ACNUR", name: "ACNUR", language: "ES", level: "Intermedio", representationType: "delegacion", representationsCount: 25, secretariat: "Asuntos Humanitarios", color: "#82BAB7", darkColor: "#1C3635" },
+  { id: "eb2c6702-122d-4e3c-bae5-185731081340", slug: "acnur", abbreviation: "ACNUR", name: "ACNUR", language: "ES", level: "Intermedio", representationType: "delegacion", representationsCount: 25, secretariat: "Asuntos Humanitarios", color: "#82BAB7", darkColor: "#1C3635" },
   { id: "4194a8ae-e21d-4fdc-a3b1-db441b7ac397", slug: "unicef", abbreviation: "UNICEF", name: "UNICEF", language: "ES", level: "Bajo", representationType: "delegacion", representationsCount: 25, secretariat: "Asuntos Humanitarios", color: "#72B7BE", darkColor: "#1C3537" },
   { id: "8c77c124-bf8e-4079-b983-ce3a28b147fc", slug: "cij", abbreviation: "ICJ", name: "International Court of Justice", language: "EN", level: "Alto", representationType: "juez", representationsCount: 15, secretariat: "Asuntos Humanitarios", color: "#2D748E", darkColor: "#142D36" },
   { id: "2a18eb34-8372-40d5-9ce8-b8aa4134a845", slug: "onudi", abbreviation: "UNIDO", name: "United Nations Industrial Development Organization", language: "EN", level: "Bajo", representationType: "delegacion", representationsCount: 25, secretariat: "Economía y Desarrollo", color: "#7A966D", darkColor: "#1E2E1A" },
@@ -31,3 +34,47 @@ export const committees: Committee[] = [
 
 export const committeeBySlug = (slug: string) =>
   committees.find((committee) => committee.slug === slug);
+
+const committeeNames: Record<string, LocalizedText> = {
+  "onu-mujeres": { es: "ONU Mujeres", en: "UN Women" },
+  acnur: { es: "Alto Comisionado de las Naciones Unidas para los Refugiados", en: "United Nations High Commissioner for Refugees" },
+  unicef: { es: "Fondo de las Naciones Unidas para la Infancia", en: "United Nations Children's Fund" },
+  cij: { es: "Corte Internacional de Justicia", en: "International Court of Justice" },
+  onudi: { es: "Organización de las Naciones Unidas para el Desarrollo Industrial", en: "United Nations Industrial Development Organization" },
+  cepa: { es: "CEPA", en: "CEPA" },
+  "banco-mundial": { es: "Banco Mundial", en: "World Bank" },
+  "consejo-de-seguridad": { es: "Consejo de Seguridad", en: "Security Council" },
+  interpol: { es: "INTERPOL", en: "INTERPOL" },
+  otan: { es: "Organización del Tratado del Atlántico Norte", en: "North Atlantic Treaty Organization" },
+};
+
+const committeeAbbreviations: Record<string, LocalizedText> = {
+  "onu-mujeres": { es: "ONU Mujeres", en: "UN Women" },
+  acnur: { es: "ACNUR", en: "UNHCR" },
+  unicef: { es: "UNICEF", en: "UNICEF" },
+  cij: { es: "CIJ", en: "ICJ" },
+  onudi: { es: "ONUDI", en: "UNIDO" },
+  cepa: { es: "CEPA", en: "CEPA" },
+  "banco-mundial": { es: "Banco Mundial", en: "World Bank" },
+  "consejo-de-seguridad": { es: "Consejo de Seguridad", en: "Security Council" },
+  interpol: { es: "INTERPOL", en: "INTERPOL" },
+  otan: { es: "OTAN", en: "NATO" },
+};
+
+const secretariatNames: Record<string, LocalizedText> = {
+  "Asuntos Humanitarios": { es: "Asuntos Humanitarios", en: "Humanitarian Affairs" },
+  "Economía y Desarrollo": { es: "Economía y Desarrollo", en: "Economy and Development" },
+  "Asuntos de Seguridad": { es: "Asuntos de Seguridad", en: "Security Affairs" },
+};
+
+export function committeeDisplayName(committee: Committee, language: Language) {
+  return committeeNames[committee.slug]?.[language] ?? committee.name;
+}
+
+export function committeeDisplayAbbreviation(committee: Committee, language: Language) {
+  return committeeAbbreviations[committee.slug]?.[language] ?? committee.abbreviation;
+}
+
+export function committeeDisplaySecretariat(committee: Committee, language: Language) {
+  return secretariatNames[committee.secretariat]?.[language] ?? committee.secretariat;
+}

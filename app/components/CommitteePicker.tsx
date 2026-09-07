@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { Committee } from "../lib/committees";
+import { committeeDisplayAbbreviation, committeeDisplayName, committeeDisplaySecretariat, type Committee } from "../lib/committees";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useLanguage } from "./LanguageProvider";
 
 export function CommitteePicker({ committees }: { committees: Committee[] }) {
   const [customName, setCustomName] = useState("");
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   function openBlankCanvas() {
     const name = customName.trim() || t("unnamedCommittee");
@@ -40,9 +40,9 @@ export function CommitteePicker({ committees }: { committees: Committee[] }) {
             style={{ "--committee-color": committee.color, "--committee-dark": committee.darkColor } as React.CSSProperties}
           >
             <span className="committee-number">{String(index + 1).padStart(2, "0")}</span>
-            <span className="committee-secretariat">{committee.secretariat}</span>
-            <h2>{committee.abbreviation}</h2>
-            <p>{committee.name}</p>
+            <span className="committee-secretariat">{committeeDisplaySecretariat(committee, language)}</span>
+            <h2>{committeeDisplayAbbreviation(committee, language)}</h2>
+            <p>{committeeDisplayName(committee, language)}</p>
             <div className="committee-meta">
               <span>{committee.language}</span><span>{committee.level === "Bajo" ? t("lowLevel") : committee.level === "Alto" ? t("highLevel") : t("intermediateLevel")}</span><span>{t("places", { count: committee.representationsCount })}</span>
             </div>

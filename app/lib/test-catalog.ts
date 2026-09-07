@@ -1,4 +1,5 @@
 import type { CommitteeDetail, Representation } from "./itammun-api";
+import { topicTranslation } from "./catalog-translations";
 
 type CountrySeed = Representation & { iso2: string };
 
@@ -52,6 +53,12 @@ const topics: Record<string, string[]> = {
 };
 
 export function getTestCommitteeDetail(slug: string): CommitteeDetail {
-  if (slug.startsWith("lienzo-")) return { topics: [], representations: [] };
-  return { topics: topics[slug] ?? ["Tópico A", "Tópico B"], representations: [...testCountries] };
+  if (slug.startsWith("lienzo-")) return { topics: [], representations: [], initiallyAssignedRepresentationIds: [], source: "blank" };
+  const sourceTopics = topics[slug] ?? ["Tópico A", "Tópico B"];
+  return {
+    topics: sourceTopics.map((title, index) => ({ id: `${slug}:test-topic:${index + 1}`, title, titleByLanguage: topicTranslation(slug, index, title) })),
+    representations: testCountries.map((country) => ({ ...country, kind: country.observer ? "observer" : "delegation", status: "available" })),
+    initiallyAssignedRepresentationIds: [],
+    source: "unavailable",
+  };
 }

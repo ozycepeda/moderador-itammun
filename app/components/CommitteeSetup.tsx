@@ -3,8 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { Committee } from "../lib/committees";
-import type { CommitteeDetail, Representation } from "../lib/itammun-api";
+import { committeeDisplayAbbreviation, committeeDisplaySecretariat, type Committee } from "../lib/committees";
+import { representationFullName, representationMatches, representationSecondaryName, type CommitteeDetail, type Representation } from "../lib/itammun-api";
 import { setupStorageKey, type StoredSetup } from "../lib/setup-state";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useLanguage } from "./LanguageProvider";
@@ -14,17 +14,18 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
   detail: CommitteeDetail;
   sessionKey: string;
 }) {
-  const [selected, setSelected] = useState(() => new Set(detail.representations.slice(0, committee.representationsCount).map((item) => item.id)));
+  const [selected, setSelected] = useState(() => new Set(detail.initiallyAssignedRepresentationIds));
   const [customParticipants, setCustomParticipants] = useState<Representation[]>([]);
   const [customName, setCustomName] = useState("");
   const [search, setSearch] = useState("");
   const [sessionTitle, setSessionTitle] = useState("");
   const { language, t } = useLanguage();
 
-  const visible = useMemo(() => detail.representations.filter((item) => item.name.toLocaleLowerCase(language).includes(search.toLocaleLowerCase(language))), [detail.representations, language, search]);
+  const visible = useMemo(() => detail.representations.filter((item) => representationMatches(item, search, language)), [detail.representations, language, search]);
   const participants = [...detail.representations, ...customParticipants];
   const assignedParticipantIds = [...selected, ...customParticipants.map((participant) => participant.id)];
-  const secretariat = committee.slug.startsWith("lienzo-") ? t("blankCanvas") : committee.secretariat;
+  const secretariat = committee.slug.startsWith("lienzo-") ? t("blankCanvas") : committeeDisplaySecretariat(committee, language);
+  const abbreviation = committee.slug.startsWith("lienzo-") ? (committee.abbreviation || t("unnamedCommittee")) : committeeDisplayAbbreviation(committee, language);
 
   function toggle(id: string) {
     setSelected((current) => {
@@ -37,7 +38,15 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
   function addCustomParticipant() {
     const name = customName.trim();
     if (!name) return;
-    setCustomParticipants((current) => [...current, { id: `custom-${crypto.randomUUID()}`, name, observer: false }]);
+    setCustomParticipants((current) => [...current, {
+      id: `custom-${crypto.randomUUID()}`,
+      name,
+      nameByLanguage: { es: name, en: name },
+      observer: false,
+      kind: "custom",
+      status: "occupied",
+      searchTerms: [name],
+    }]);
     setCustomName("");
   }
 
@@ -62,7 +71,7 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
     <main className="setup-shell" style={cssVars}>
       <header className="console-header">
         <Link href="/" className="console-brand"><span className="brand-mark">I</span><span>ITAMMUN</span></Link>
-        <div className="committee-heading"><span>{secretariat}</span><h1>{committee.abbreviation}</h1></div>
+        <div className="committee-heading"><span>{secretariat}</span><h1>{abbreviation}</h1></div>
         <div className="header-actions"><span className="setup-step">{t("prepareSession")}</span><LanguageSwitcher dark /></div>
       </header>
 
@@ -79,6 +88,8 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
             <input id="session-title" value={sessionTitle} onChange={(event) => setSessionTitle(event.target.value)} placeholder={t("sessionTitlePlaceholder")} autoFocus />
             <p>{t("sessionTitleHelp")}</p>
           </div>
+          {detail.source === "live" && <div className="catalog-status catalog-status-live"><strong>{t("liveCatalogLoaded")}</strong><span>{t("liveCatalogHelp")}</span></div>}
+          {detail.source === "unavailable" && <div className="catalog-status catalog-status-error" role="alert"><strong>{t("catalogUnavailable")}</strong><span>{t("catalogUnavailableHelp")}</span><button type="button" onClick={() => window.location.reload()}>{t("retry")}</button></div>}
           <div className="setup-panel-heading"><div><span className="section-kicker">{t("countriesAndPeople")}</span><h2>{t("initialSeats")}</h2></div><strong>{assignedParticipantIds.length}</strong></div>
           {detail.representations.length > 0 && (
             <>
@@ -92,7 +103,8 @@ export function CommitteeSetup({ committee, detail, sessionKey }: {
                   <label key={item.id} className="setup-country-row">
                     <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggle(item.id)} />
                     {item.flagUrl ? <Image src={item.flagUrl} alt="" width={28} height={19} unoptimized /> : <span className="flag-placeholder" />}
-                    <span>{item.name}</span>
+                    <span>{representationFullName(item, language)}</span>
+                    {representationSecondaryName(item, language) && <em>{t("judgeRepresentation")}</em>}
                   </label>
                 ))}
               </div>
