@@ -3,17 +3,21 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { Committee } from "../lib/committees";
-import type { CommitteeDetail } from "../lib/itammun-api";
+import { committeeDisplayAbbreviation, committeeDisplayName, committeeDisplaySecretariat, type Committee } from "../lib/committees";
+import { features } from "../lib/features";
+import { representationFullName, representationPrimaryName, representationSecondaryName, topicDisplayTitle, type CommitteeDetail, type CommitteeTopic } from "../lib/itammun-api";
 import { useLocalCommitteeState } from "../hooks/useLocalCommitteeState";
 import { attendanceCsvFilename, buildAttendanceCsv } from "../lib/attendance-csv";
 import {
   advanceFinalVoteExplanation,
   advanceFinalVoteStage,
+  advanceToNextSpeaker,
+  applySpeakerYield,
   castFinalVote,
   createInitialFinalVoteState,
   createInitialState,
   getDisciplinaryCounts,
+  isParticipantInDebate,
   startFinalVote,
   type AttendanceStatus,
   type CaucusMode,
@@ -27,7 +31,7 @@ import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useLanguage } from "./LanguageProvider";
 import { SpeakerQueue } from "./SpeakerQueue";
 
-const tabIds: ConsoleTab[] = ["rollcall", "speakers", "caucus", "motions", "voting", "log"];
+const tabIds: ConsoleTab[] = ["rollcall", "speakers", "caucus", ...(features.motionsAndAppeals ? ["motions" as const] : []), "voting", "log"];
 const attendanceValues: Array<Exclude<AttendanceStatus, "pending">> = ["present", "present-voting", "absent", "observer"];
 
 export function CommitteeConsole({ committee, detail, sessionKey }: {
@@ -36,7 +40,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
   sessionKey: string;
 }) {
   const { language, t } = useLanguage();
-  const { state, update } = useLocalCommitteeState(sessionKey, createInitialState(detail.representations));
+  const { state, update, closeSession } = useLocalCommitteeState(sessionKey, createInitialState(detail.representations));
   const [activeTab, setActiveTab] = useState<ConsoleTab>("rollcall");
   const [rollCallView, setRollCallView] = useState<"attendance" | "warnings">("attendance");
   const [speakerView, setSpeakerView] = useState<"list" | "questions">("list");
@@ -47,8 +51,6 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
   const [copied, setCopied] = useState(false);
   const [remaining, setRemaining] = useState(state.currentSpeakerAllottedTime);
   const [running, setRunning] = useState(false);
-  const [questionRemaining, setQuestionRemaining] = useState(state.speakerTime);
-  const [questionRunning, setQuestionRunning] = useState(false);
   const [caucusMode, setCaucusMode] = useState<CaucusMode>("moderated");
   const [caucusRemaining, setCaucusRemaining] = useState(state.caucuses.moderated.duration);
   const [caucusRunning, setCaucusRunning] = useState(false);
@@ -71,15 +73,6 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
     }), 1000);
     return () => window.clearInterval(timer);
   }, [running, remaining]);
-
-  useEffect(() => {
-    if (!questionRunning || questionRemaining <= 0) return;
-    const timer = window.setInterval(() => setQuestionRemaining((value) => {
-      if (value <= 1) setQuestionRunning(false);
-      return Math.max(0, value - 1);
-    }), 1000);
-    return () => window.clearInterval(timer);
-  }, [questionRemaining, questionRunning]);
 
   useEffect(() => {
     if (!caucusRunning || caucusRemaining <= 0) return;
@@ -106,17 +99,23 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
     const assigned = new Set(state.assignedParticipantIds);
     return [...state.participants].sort((left, right) => {
       const assignmentDifference = Number(assigned.has(right.id)) - Number(assigned.has(left.id));
-      return assignmentDifference || left.name.localeCompare(right.name, language);
+      return assignmentDifference || representationFullName(left, language).localeCompare(representationFullName(right, language), language);
     });
   }, [language, state.assignedParticipantIds, state.participants]);
+
+  const participantsInDebate = useMemo(
+    () => state.participants.filter((participant) => isParticipantInDebate(state.attendance[participant.id])),
+    [state.attendance, state.participants],
+  );
 
   const eligibleVoters = useMemo(
     () => state.participants.filter((participant) => state.attendance[participant.id] === "present-voting"),
     [state.attendance, state.participants],
   );
   const topicLocked = state.speakers.length > 0;
-  const knownTopic = detail.topics.includes(state.topic);
-  const topicSelectValue = customTopicMode || (state.topic && !knownTopic) ? "__custom" : state.topic;
+  const legacyKnownTopic = detail.topics.find((topic) => topic.title === state.topic);
+  const knownTopic = detail.topics.find((topic) => topic.id === state.topicId) ?? legacyKnownTopic;
+  const topicSelectValue = customTopicMode || (state.topic && !knownTopic) ? "__custom" : knownTopic?.id ?? "";
   const currentAppealVoterId = state.vote.status === "active" ? state.vote.queue[state.vote.currentIndex] : undefined;
   const currentAppealVoter = state.participants.find((participant) => participant.id === currentAppealVoterId);
   const appealVoteCounts = Object.values(state.vote.ballots).reduce((counts, choice) => ({ ...counts, [choice]: counts[choice] + 1 }), { for: 0, against: 0 });
@@ -126,48 +125,82 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
   const finalVoteParticipant = state.participants.find((participant) => participant.id === finalVoteParticipantId);
   const finalVoteCounts = Object.values(state.finalVote.roundThree).reduce((counts, choice) => ({ ...counts, [choice]: counts[choice] + 1 }), { for: 0, against: 0 });
   const activeCaucus = state.caucuses[caucusMode];
-  const secretariat = committee.slug.startsWith("lienzo-") ? t("blankCanvas") : committee.secretariat;
+  const secretariat = committee.slug.startsWith("lienzo-") ? t("blankCanvas") : committeeDisplaySecretariat(committee, language);
+  const abbreviation = committee.slug.startsWith("lienzo-") ? committee.abbreviation : committeeDisplayAbbreviation(committee, language);
+  const committeeName = committee.slug.startsWith("lienzo-") ? (committee.name || t("unnamedCommittee")) : committeeDisplayName(committee, language);
+  const displayedTopic = state.topicByLanguage?.[language] ?? state.topic;
+  const currentSpeakerParticipant = state.participants.find((participant) => participant.id === state.currentSpeakerParticipantId);
+  const currentSpeakerName = currentSpeakerParticipant ? representationFullName(currentSpeakerParticipant, language) : state.currentSpeaker;
+  const currentQuestionerParticipant = state.participants.find((participant) => participant.id === state.currentQuestionerParticipantId);
+  const currentQuestionerName = currentQuestionerParticipant ? representationFullName(currentQuestionerParticipant, language) : state.currentQuestioner;
+
+  function participantName(participantId: string | undefined, fallback = "") {
+    const participant = state.participants.find((item) => item.id === participantId);
+    return participant ? representationFullName(participant, language) : fallback;
+  }
+
+  function queueItemName(item: { participantId?: string; name: string }) {
+    return participantName(item.participantId, item.name);
+  }
+
+  function localizedEventValues(event: Extract<SessionState["events"][number], { key: string }>) {
+    const values = { ...(event.values ?? {}) };
+    if (typeof values.participantId === "string" && values.participantId) {
+      values.name = participantName(values.participantId, typeof values.name === "string" ? values.name : "");
+    }
+    if (typeof values.recipientId === "string" && values.recipientId) {
+      values.recipient = participantName(values.recipientId, typeof values.recipient === "string" ? values.recipient : "");
+    }
+    if (typeof values.topicId === "string" && values.topicId) {
+      const topic = detail.topics.find((item) => item.id === values.topicId);
+      if (topic) {
+        values.topic = topicDisplayTitle(topic, language);
+        values.label = topicDisplayTitle(topic, language);
+      }
+    }
+    if (values.modeId === "moderated" || values.modeId === "simple") {
+      values.mode = t(values.modeId === "moderated" ? "moderatedCaucus" : "simpleCaucus");
+    }
+    return values;
+  }
 
   function disciplinaryLabel(totalWarnings: number) {
     const discipline = getDisciplinaryCounts(totalWarnings);
     return t("disciplinaryBadge", { warnings: discipline.activeWarnings, faults: discipline.faults });
   }
 
-  function updateTopic(topic: string) {
+  function updateTopic(topic: CommitteeTopic | string) {
+    const value = typeof topic === "string" ? topic : topic.title;
+    const translatedValue = typeof topic === "string" ? topic : topicDisplayTitle(topic, language);
     update((current) => ({
       ...current,
-      topic,
-      events: topic && topic !== current.topic ? [{ key: "eventTopicDefined", values: { topic } }, ...current.events] : current.events,
+      topic: value,
+      topicId: typeof topic === "string" ? "" : topic.id,
+      topicByLanguage: typeof topic === "string" ? undefined : topic.titleByLanguage,
+      events: value && value !== current.topic ? [{ key: "eventTopicDefined", values: { topic: translatedValue, topicId: typeof topic === "string" ? "" : topic.id } }, ...current.events] : current.events,
     }));
   }
 
   function addSpeaker() {
-    const participant = state.participants.find((item) => item.id === speakerParticipantId);
+    const participant = participantsInDebate.find((item) => item.id === speakerParticipantId);
     if (!participant || !state.topic) return;
     update((current) => ({
       ...current,
       speakers: [...current.speakers, { id: crypto.randomUUID(), participantId: participant.id, name: participant.name, bonusSeconds: 0 }],
-      events: [{ key: "eventSpeakerAdded", values: { name: participant.name } }, ...current.events],
+      events: [{ key: "eventSpeakerAdded", values: { name: representationFullName(participant, language), participantId: participant.id } }, ...current.events],
     }));
     setSpeakerParticipantId("");
   }
 
-  function beginNextSpeaker(donatedSeconds = 0) {
+  function beginNextSpeaker() {
     const next = state.speakers[0];
     if (!next) return;
-    const bonus = (next.bonusSeconds ?? 0) + donatedSeconds;
-    const allotted = state.speakerTime + bonus;
-    const priorSpeaker = state.currentSpeaker;
+    const donatedSeconds = state.currentSpeakerYield === "next" ? state.pendingDonationSeconds : 0;
+    const allotted = state.speakerTime + (next.bonusSeconds ?? 0) + donatedSeconds;
     update((current) => ({
-      ...current,
-      speakers: current.speakers.slice(1),
-      currentSpeaker: next.name,
-      currentSpeakerParticipantId: next.participantId ?? "",
-      currentSpeakerAllottedTime: allotted,
-      currentSpeakerReceivedDonation: donatedSeconds > 0 || (next.bonusSeconds ?? 0) > 0,
+      ...advanceToNextSpeaker(current),
       events: [
-        ...(donatedSeconds > 0 && priorSpeaker ? [{ key: "eventSpeakerYieldedNext" as const, values: { name: priorSpeaker, time: formatTime(donatedSeconds), recipient: next.name } }] : []),
-        { key: "eventSpeakerStarted", values: { name: next.name, time: formatTime(allotted) } },
+        { key: "eventSpeakerStarted", values: { name: participantName(next.participantId, next.name), participantId: next.participantId ?? "", time: formatTime(allotted) } },
         ...current.events,
       ],
     }));
@@ -177,26 +210,42 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
 
   function yieldToChair() {
     if (!state.currentSpeaker || remaining <= 0) return;
-    const name = state.currentSpeaker;
     update((current) => ({
-      ...current,
-      currentSpeaker: "",
-      currentSpeakerParticipantId: "",
-      currentSpeakerAllottedTime: current.speakerTime,
-      currentSpeakerReceivedDonation: false,
-      events: [{ key: "eventSpeakerYieldedChair", values: { name, time: formatTime(remaining) } }, ...current.events],
+      ...applySpeakerYield(current, "chair", remaining),
+      events: [{ key: "eventSpeakerYieldedChair", values: { name: currentSpeakerName, participantId: current.currentSpeakerParticipantId, time: formatTime(remaining) } }, ...current.events],
     }));
-    setRemaining(state.speakerTime);
+    setRemaining(0);
+    setRunning(false);
+  }
+
+  function yieldToNextSpeaker() {
+    const next = state.speakers[0];
+    if (!state.currentSpeaker || !next || remaining <= 0 || state.currentSpeakerReceivedDonation) return;
+    const recipient = participantName(next.participantId, next.name);
+    update((current) => ({
+      ...applySpeakerYield(current, "next", remaining),
+      events: [{ key: "eventSpeakerYieldedNext", values: { name: currentSpeakerName, participantId: current.currentSpeakerParticipantId, time: formatTime(remaining), recipient, recipientId: next.participantId ?? "" } }, ...current.events],
+    }));
+    setRemaining(0);
+    setRunning(false);
+  }
+
+  function yieldToQuestions() {
+    if (!state.currentSpeaker || remaining <= 0) return;
+    update((current) => ({
+      ...applySpeakerYield(current, "questions", remaining),
+      events: [{ key: "eventSpeakerYieldedQuestions", values: { name: currentSpeakerName, participantId: current.currentSpeakerParticipantId, time: formatTime(remaining) } }, ...current.events],
+    }));
     setRunning(false);
   }
 
   function addQuestioner() {
-    const participant = state.participants.find((item) => item.id === questionParticipantId);
+    const participant = participantsInDebate.find((item) => item.id === questionParticipantId);
     if (!participant || !state.currentSpeaker) return;
     update((current) => ({
       ...current,
       questionQueue: [...current.questionQueue, { id: crypto.randomUUID(), participantId: participant.id, name: participant.name }],
-      events: [{ key: "eventQuestionerAdded", values: { name: participant.name } }, ...current.events],
+      events: [{ key: "eventQuestionerAdded", values: { name: representationFullName(participant, language), participantId: participant.id } }, ...current.events],
     }));
     setQuestionParticipantId("");
   }
@@ -208,10 +257,9 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
       ...current,
       questionQueue: current.questionQueue.slice(1),
       currentQuestioner: next.name,
-      events: [{ key: "eventQuestionStarted", values: { name: next.name, time: formatTime(current.speakerTime) } }, ...current.events],
+      currentQuestionerParticipantId: next.participantId ?? "",
+      events: [{ key: "eventQuestionStarted", values: { name: participantName(next.participantId, next.name), participantId: next.participantId ?? "" } }, ...current.events],
     }));
-    setQuestionRemaining(state.speakerTime);
-    setQuestionRunning(false);
   }
 
   function addWarning(participantId: string, name: string) {
@@ -220,8 +268,8 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
       const count = previousCount + 1;
       const previousFaults = getDisciplinaryCounts(previousCount).faults;
       const faults = getDisciplinaryCounts(count).faults;
-      const faultEvent: SessionState["events"] = faults > previousFaults ? [{ key: "eventFaultAdded", values: { name, count: faults } }] : [];
-      return { ...current, warnings: { ...current.warnings, [participantId]: count }, events: [...faultEvent, { key: "eventWarningAdded", values: { name, count } }, ...current.events] };
+      const faultEvent: SessionState["events"] = faults > previousFaults ? [{ key: "eventFaultAdded", values: { name, participantId, count: faults } }] : [];
+      return { ...current, warnings: { ...current.warnings, [participantId]: count }, events: [...faultEvent, { key: "eventWarningAdded", values: { name, participantId, count } }, ...current.events] };
     });
   }
 
@@ -231,8 +279,8 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
       const count = Math.max(0, previousCount - 1);
       const previousFaults = getDisciplinaryCounts(previousCount).faults;
       const faults = getDisciplinaryCounts(count).faults;
-      const faultEvent: SessionState["events"] = faults < previousFaults ? [{ key: "eventFaultRemoved", values: { name, count: faults } }] : [];
-      return { ...current, warnings: { ...current.warnings, [participantId]: count }, events: [...faultEvent, { key: "eventWarningRemoved", values: { name, count } }, ...current.events] };
+      const faultEvent: SessionState["events"] = faults < previousFaults ? [{ key: "eventFaultRemoved", values: { name, participantId, count: faults } }] : [];
+      return { ...current, warnings: { ...current.warnings, [participantId]: count }, events: [...faultEvent, { key: "eventWarningRemoved", values: { name, participantId, count } }, ...current.events] };
     });
   }
 
@@ -248,6 +296,14 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
     URL.revokeObjectURL(url);
   }
 
+  function finishSession() {
+    if (!window.confirm(t("finishSessionConfirm"))) return;
+    exportAttendance();
+    closeSession();
+    window.alert(t("sessionClosedSuccess"));
+    window.location.replace("/");
+  }
+
   function selectCaucusMode(mode: CaucusMode) {
     setCaucusMode(mode);
     setCaucusRemaining(state.caucuses[mode].duration);
@@ -256,7 +312,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
 
   async function share() {
     const setupUrl = new URL(`/comite/${sessionKey}/setup`, window.location.origin);
-    setupUrl.searchParams.set("nombre", committee.name);
+    setupUrl.searchParams.set("nombre", committeeName);
     await navigator.clipboard.writeText(setupUrl.toString());
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
@@ -315,7 +371,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
     update((current) => ({
       ...current,
       finalVote: startFinalVote(current.topic, queue),
-      events: [{ key: "eventFinalVoteStarted", values: { label: current.topic } }, ...current.events],
+      events: [{ key: "eventFinalVoteStarted", values: { label: current.topic, topicId: current.topicId } }, ...current.events],
     }));
   }
 
@@ -327,7 +383,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
       return {
         ...current,
         finalVote,
-        events: completedNow ? [{ key: "eventFinalVoteCompleted", values: { label: finalVote.label } }, ...current.events] : current.events,
+        events: completedNow ? [{ key: "eventFinalVoteCompleted", values: { label: finalVote.label, topicId: current.topicId } }, ...current.events] : current.events,
       };
     });
   }
@@ -338,12 +394,12 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
     <main className="console-shell" style={cssVars}>
       <header className="console-header">
         <Link href="/" className="console-brand"><span className="brand-mark">I</span><span>ITAMMUN</span></Link>
-        <div className="committee-heading"><span>{secretariat}</span><h1>{committee.abbreviation}</h1></div>
+        <div className="committee-heading"><span>{secretariat}</span><h1>{abbreviation}</h1></div>
         <div className="sharing-tools">
           <span className="sync-state sync-local">{t("savedLocally")}</span>
-          <a className="secondary-button" href={`/comite/${sessionKey}/setup?nombre=${encodeURIComponent(committee.name)}`}>{t("newSession")}</a>
-          <a className="secondary-button" href={`/comite/${sessionKey}/pantalla?nombre=${encodeURIComponent(committee.name)}`} target="_blank" rel="noreferrer">{t("screen")}</a>
-          <button className="secondary-button" onClick={share}>{t(copied ? "linkCopied" : "share")}</button>
+          <button className="secondary-button finish-session-button" onClick={finishSession}>{t("finishSession")}</button>
+          <a className="secondary-button" href={`/comite/${sessionKey}/pantalla?nombre=${encodeURIComponent(committeeName)}`} target="_blank" rel="noreferrer">{t("screen")}</a>
+          <button className="secondary-button share-button" onClick={share}>{t(copied ? "linkCopied" : "share")}</button>
           <LanguageSwitcher dark />
         </div>
       </header>
@@ -356,7 +412,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
 
       <section className={`session-topic-strip ${state.topic ? "topic-ready" : ""}`}>
         <span className="section-kicker">{t("topic")}</span>
-        <strong>{state.topic || t("topicPending")}</strong>
+        <strong>{displayedTopic || t("topicPending")}</strong>
       </section>
 
       <nav className="console-tabs" aria-label={t("committeeModules")}>
@@ -375,12 +431,13 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
             {rollCallView === "attendance" ? <>
               <div className="attendance-summary"><span>{t("inRoom")} <strong>{attendance.inRoom}</strong></span><span>{t("presentAndVoting")} <strong>{attendance.voting}</strong></span><span>{t("simpleMajority")} <strong>{Math.floor(attendance.voting / 2) + 1}</strong></span><span>{t("qualifiedMajority")} <strong>{Math.ceil(attendance.voting * 2 / 3)}</strong></span></div>
               <section className={`topic-editor ${topicLocked ? "is-locked" : ""}`}>
-                <div><span className="section-kicker">{t("sessionTopic")}</span><h3>{state.topic || t("selectOrCreateTopic")}</h3>{topicLocked && <p>{t("emptyQueueToChangeTopic")}</p>}</div>
+                <div><span className="section-kicker">{t("sessionTopic")}</span><h3>{displayedTopic || t("selectOrCreateTopic")}</h3>{topicLocked && <p>{t("emptyQueueToChangeTopic")}</p>}</div>
                 <div className="topic-editor-controls">
                   {detail.topics.length > 0 && <select aria-label={t("sessionTopic")} disabled={topicLocked} value={topicSelectValue} onChange={(event) => {
                     if (event.target.value === "__custom") { setTopicDraft(state.topic && !knownTopic ? state.topic : ""); setCustomTopicMode(true); return; }
-                    setCustomTopicMode(false); setTopicDraft(""); updateTopic(event.target.value);
-                  }}><option value="">{t("selectTopic")}</option>{detail.topics.map((topic) => <option key={topic} value={topic}>{topic}</option>)}<option value="__custom">{t("writeOtherTopic")}</option></select>}
+                    const topic = detail.topics.find((item) => item.id === event.target.value);
+                    setCustomTopicMode(false); setTopicDraft(""); if (topic) updateTopic(topic);
+                  }}><option value="">{t("selectTopic")}</option>{detail.topics.map((topic) => <option key={topic.id} value={topic.id}>{topicDisplayTitle(topic, language)}</option>)}<option value="__custom">{t("writeOtherTopic")}</option></select>}
                   {(detail.topics.length === 0 || customTopicMode || (state.topic && !knownTopic)) && <form onSubmit={(event) => {
                     event.preventDefault(); const topic = topicDraft.trim(); if (!topic || topicLocked) return; updateTopic(topic); setTopicDraft(topic); setCustomTopicMode(false);
                   }}><input disabled={topicLocked} value={topicDraft} onChange={(event) => setTopicDraft(event.target.value)} placeholder={t("writeTopic")} aria-label={t("newTopic")} /><button type="submit" disabled={topicLocked || !topicDraft.trim()}>{t("defineTopic")}</button></form>}
@@ -390,8 +447,8 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
                 const value = state.attendance[representation.id] || "pending";
                 const initiallyAssigned = state.assignedParticipantIds.includes(representation.id);
                 return <article className="attendance-row" key={representation.id}>
-                  <div className="attendance-person">{representation.flagUrl && <Image src={representation.flagUrl} alt="" width={32} height={22} unoptimized />}<span>{representation.name}</span><em>{t(initiallyAssigned ? "initialSeat" : "available")}</em></div>
-                  <div className="attendance-buttons" role="group" aria-label={t("attendanceFor", { name: representation.name })}>{attendanceValues.map((option) => <button key={option} type="button" aria-pressed={value === option} className={`attendance-button status-${option}`} onClick={() => update((current) => ({ ...current, attendance: { ...current.attendance, [representation.id]: option } }))}>{attendanceLabels[option]}</button>)}<button type="button" className="attendance-clear" disabled={value === "pending"} onClick={() => update((current) => ({ ...current, attendance: { ...current.attendance, [representation.id]: "pending" } }))}>{t("clear")}</button></div>
+                  <div className="attendance-person">{representation.flagUrl && <Image src={representation.flagUrl} alt="" width={32} height={22} unoptimized />}<span>{representationPrimaryName(representation, language)}{representationSecondaryName(representation, language) && <small>{representationSecondaryName(representation, language)}</small>}</span><em>{t(initiallyAssigned ? "initialSeat" : "available")}</em></div>
+                  <div className="attendance-buttons" role="group" aria-label={t("attendanceFor", { name: representationFullName(representation, language) })}>{attendanceValues.map((option) => <button key={option} type="button" aria-pressed={value === option} className={`attendance-button status-${option}`} onClick={() => update((current) => ({ ...current, attendance: { ...current.attendance, [representation.id]: option } }))}>{attendanceLabels[option]}</button>)}<button type="button" className="attendance-clear" disabled={value === "pending"} onClick={() => update((current) => ({ ...current, attendance: { ...current.attendance, [representation.id]: "pending" } }))}>{t("clear")}</button></div>
                 </article>;
               })}</div>
               <section className="attendance-export-panel">
@@ -404,9 +461,9 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
                 const count = state.warnings[participant.id] ?? 0;
                 const discipline = getDisciplinaryCounts(count);
                 return <article className="warning-row" key={participant.id}>
-                  <div className="attendance-person">{participant.flagUrl && <Image src={participant.flagUrl} alt="" width={32} height={22} unoptimized />}<span>{participant.name}</span>{count > 0 && <em>{t("activeWarningCount", { count: discipline.activeWarnings })} · {t("faultCount", { count: discipline.faults })}</em>}</div>
+                  <div className="attendance-person">{participant.flagUrl && <Image src={participant.flagUrl} alt="" width={32} height={22} unoptimized />}<span>{representationPrimaryName(participant, language)}{representationSecondaryName(participant, language) && <small>{representationSecondaryName(participant, language)}</small>}</span>{count > 0 && <em>{t("activeWarningCount", { count: discipline.activeWarnings })} · {t("faultCount", { count: discipline.faults })}</em>}</div>
                   <div className="discipline-counts"><strong>{discipline.activeWarnings}</strong><span>{t("faultCount", { count: discipline.faults })}</span></div>
-                  <div><button className="warning-add" onClick={() => addWarning(participant.id, participant.name)}>{t("addWarning")}</button><button disabled={count === 0} onClick={() => undoWarning(participant.id, participant.name)}>{t("undoWarning")}</button></div>
+                  <div><button className="warning-add" onClick={() => addWarning(participant.id, representationFullName(participant, language))}>{t("addWarning")}</button><button disabled={count === 0} onClick={() => undoWarning(participant.id, representationFullName(participant, language))}>{t("undoWarning")}</button></div>
                 </article>;
               })}</div>
             </div>}
@@ -418,28 +475,30 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
             <div className="console-subtabs speakers-subtabs" role="group" aria-label={t("speakers")}><button className={speakerView === "list" ? "active" : ""} onClick={() => setSpeakerView("list")}>{t("speakerListMode")}</button><button className={speakerView === "questions" ? "active" : ""} onClick={() => setSpeakerView("questions")}>{t("extraordinaryQuestions")}</button></div>
             {speakerView === "list" ? <div className="speakers-layout">
               <div className="speaker-stage">
-                <div className="stage-label">{t("currentSpeaker")}</div><h2>{state.currentSpeaker || t("noSpeaker")}</h2><div className="timer-display">{formatTime(remaining)}</div>
+                <div className="stage-label">{t("currentSpeaker")}</div><h2>{currentSpeakerName || t("noSpeaker")}</h2><div className="timer-display">{formatTime(remaining)}</div>
                 {state.currentSpeakerReceivedDonation && <span className="donation-note">{t("allottedWithDonation", { base: formatTime(state.speakerTime), donation: formatTime(Math.max(0, state.currentSpeakerAllottedTime - state.speakerTime)) })}</span>}
                 <TimeInput label={t("allottedTime")} seconds={state.speakerTime} onChange={(seconds) => { if (!state.currentSpeaker) setRemaining(seconds); update((current) => ({ ...current, speakerTime: seconds, currentSpeakerAllottedTime: current.currentSpeaker ? current.currentSpeakerAllottedTime : seconds })); }} compact />
-                <div className="primary-controls"><button onClick={() => { setRemaining(state.currentSpeaker ? state.currentSpeakerAllottedTime : state.speakerTime); setRunning(false); }}>{t("reset")}</button><button className="primary-button" disabled={!state.currentSpeaker} onClick={() => setRunning((value) => !value)}>{t(running ? "pause" : "start")}</button><button disabled={state.speakers.length === 0} onClick={() => beginNextSpeaker()}>{t("nextSpeaker")}</button></div>
-                {state.currentSpeaker && remaining > 0 && <div className="yield-panel"><span>{t("yieldRemainingTime")}</span><div><button onClick={yieldToChair}>{t("yieldToChair")}</button><button disabled={state.speakers.length === 0 || state.currentSpeakerReceivedDonation} onClick={() => beginNextSpeaker(remaining)}>{t("yieldToNextSpeaker")}</button></div></div>}
+                <div className="primary-controls"><button onClick={() => { setRemaining(state.currentSpeaker ? state.currentSpeakerAllottedTime : state.speakerTime); setRunning(false); update((current) => ({ ...current, currentSpeakerYield: "none", pendingDonationSeconds: 0 })); }}>{t("reset")}</button><button className="primary-button" disabled={!state.currentSpeaker || (state.currentSpeakerYield !== "none" && state.currentSpeakerYield !== "questions")} onClick={() => setRunning((value) => !value)}>{t(running ? "pause" : "start")}</button><button disabled={state.speakers.length === 0} onClick={beginNextSpeaker}>{t("nextSpeaker")}</button></div>
+                {state.currentSpeakerYield !== "none" && <div className={`yield-status yield-status-${state.currentSpeakerYield}`}><strong>{t(state.currentSpeakerYield === "questions" ? "ordinaryQuestionsActive" : state.currentSpeakerYield === "next" ? "yieldRecordedNext" : "yieldRecordedChair")}</strong>{state.currentSpeakerYield === "questions" && <><span>{t("ordinaryQuestionsHelp")}</span><button type="button" onClick={() => { setRemaining(0); setRunning(false); }}>{t("finishOrdinaryQuestions")}</button></>}</div>}
+                {state.currentSpeaker && remaining > 0 && state.currentSpeakerYield === "none" && <div className="yield-panel"><span>{t("yieldRemainingTime")}</span><div><button onClick={yieldToQuestions}>{t("yieldToQuestions")}</button><button onClick={yieldToChair}>{t("yieldToChair")}</button><button disabled={state.speakers.length === 0 || state.currentSpeakerReceivedDonation} onClick={yieldToNextSpeaker}>{t("yieldToNextSpeaker")}</button></div></div>}
               </div>
               <div className="queue-panel">
                 <div className="panel-heading"><div><span className="section-kicker">{t("generalList")}</span><h2>{t("nextSpeakers")}</h2></div><span>{state.speakers.length}</span></div>
-                <form className="speaker-form" onSubmit={(event) => { event.preventDefault(); addSpeaker(); }}><select aria-label={t("selectNextSpeaker")} value={speakerParticipantId} onChange={(event) => setSpeakerParticipantId(event.target.value)}><option value="">{t("selectCountryOrRepresentation")}</option>{state.participants.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="primary-button" disabled={!speakerParticipantId}>{t("add")}</button></form>
-                <SpeakerQueue items={state.speakers} onChange={(speakers, event) => update((current) => ({ ...current, speakers, events: [event, ...current.events] }))} />
+                <form className="speaker-form" onSubmit={(event) => { event.preventDefault(); addSpeaker(); }}><select aria-label={t("selectNextSpeaker")} value={speakerParticipantId} onChange={(event) => setSpeakerParticipantId(event.target.value)}><option value="">{t("selectCountryOrRepresentation")}</option>{participantsInDebate.map((item) => <option key={item.id} value={item.id}>{representationFullName(item, language)}</option>)}</select><button className="primary-button" disabled={!speakerParticipantId}>{t("add")}</button></form>
+                {participantsInDebate.length === 0 && <p className="module-note">{t("noParticipantsInDebate")}</p>}
+                <SpeakerQueue items={state.speakers} getLabel={queueItemName} onChange={(speakers, event) => update((current) => ({ ...current, speakers, events: [event, ...current.events] }))} />
               </div>
             </div> : <div className="speakers-layout questions-layout">
               <div className="speaker-stage">
-                <div className="stage-label">{t("currentQuestioner")}</div><h2>{state.currentQuestioner || t("noQuestioner")}</h2><div className="timer-display">{formatTime(questionRemaining)}</div>
-                <TimeInput label={t("allottedTime")} seconds={state.speakerTime} onChange={(seconds) => { setQuestionRemaining(seconds); update((current) => ({ ...current, speakerTime: seconds })); }} compact />
-                <div className="primary-controls"><button onClick={() => { setQuestionRemaining(state.speakerTime); setQuestionRunning(false); }}>{t("reset")}</button><button className="primary-button" disabled={!state.currentQuestioner} onClick={() => setQuestionRunning((value) => !value)}>{t(questionRunning ? "pause" : "start")}</button><button disabled={!state.currentSpeaker || state.questionQueue.length === 0} onClick={nextQuestioner}>{t("nextQuestioner")}</button></div>
+                <div className="stage-label">{t("currentQuestioner")}</div><h2>{currentQuestionerName || t("noQuestioner")}</h2>
+                <div className="zero-time-badge">{t("extraordinaryQuestionsNoTime")}</div>
+                <div className="primary-controls"><button className="primary-button" disabled={!state.currentSpeaker || state.questionQueue.length === 0} onClick={nextQuestioner}>{t("nextQuestioner")}</button></div>
               </div>
               <div className="queue-panel">
-                <div className="question-target"><span className="section-kicker">{t("questionTarget")}</span><h2>{state.currentSpeaker ? t("questionTargetName", { name: state.currentSpeaker }) : t("noQuestionTarget")}</h2></div>
+                <div className="question-target"><span className="section-kicker">{t("questionTarget")}</span><h2>{state.currentSpeaker ? t("questionTargetName", { name: currentSpeakerName }) : t("noQuestionTarget")}</h2></div>
                 <div className="panel-heading"><div><span className="section-kicker">{t("extraordinaryQuestions")}</span><h2>{t("questionQueue")}</h2></div><span>{state.questionQueue.length}</span></div>
-                <form className="speaker-form" onSubmit={(event) => { event.preventDefault(); addQuestioner(); }}><select disabled={!state.currentSpeaker} aria-label={t("selectQuestioner")} value={questionParticipantId} onChange={(event) => setQuestionParticipantId(event.target.value)}><option value="">{t("selectCountryOrRepresentation")}</option>{state.participants.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="primary-button" disabled={!state.currentSpeaker || !questionParticipantId}>{t("add")}</button></form>
-                <SpeakerQueue emptyText={t("emptyQuestionQueue")} items={state.questionQueue} onChange={(questionQueue, event) => update((current) => ({ ...current, questionQueue, events: [event, ...current.events] }))} />
+                <form className="speaker-form" onSubmit={(event) => { event.preventDefault(); addQuestioner(); }}><select disabled={!state.currentSpeaker} aria-label={t("selectQuestioner")} value={questionParticipantId} onChange={(event) => setQuestionParticipantId(event.target.value)}><option value="">{t("selectCountryOrRepresentation")}</option>{participantsInDebate.map((item) => <option key={item.id} value={item.id}>{representationFullName(item, language)}</option>)}</select><button className="primary-button" disabled={!state.currentSpeaker || !questionParticipantId}>{t("add")}</button></form>
+                <SpeakerQueue emptyText={t("emptyQuestionQueue")} items={state.questionQueue} getLabel={queueItemName} onChange={(questionQueue, event) => update((current) => ({ ...current, questionQueue, events: [event, ...current.events] }))} />
               </div>
             </div>}
           </section>
@@ -449,15 +508,15 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
           <section className="caucus-module">
             <div className="console-subtabs caucus-subtabs" role="group" aria-label={t("caucusAndExtensions")}><button className={caucusMode === "moderated" ? "active" : ""} onClick={() => selectCaucusMode("moderated")}>{t("moderatedCaucus")}</button><button className={caucusMode === "simple" ? "active" : ""} onClick={() => selectCaucusMode("simple")}>{t("simpleCaucus")}</button></div>
             <div className="caucus-focus">
-              <span className="section-kicker">{t(caucusMode === "moderated" ? "moderatedCaucus" : "simpleCaucus")} · {t("topic")}</span><h2>{state.topic}</h2><p className="caucus-mode-hint">{t(caucusMode === "moderated" ? "moderatedCaucusHint" : "simpleCaucusHint")}</p>
+              <span className="section-kicker">{t(caucusMode === "moderated" ? "moderatedCaucus" : "simpleCaucus")} · {t("topic")}</span><h2>{displayedTopic}</h2><p className="caucus-mode-hint">{t(caucusMode === "moderated" ? "moderatedCaucusHint" : "simpleCaucusHint")}</p>
               <div className="timer-display">{formatTime(caucusRemaining)}</div>
               <TimeInput label={t("totalDuration")} seconds={activeCaucus.duration} onChange={(seconds) => { setCaucusRemaining(seconds); update((current) => ({ ...current, caucuses: { ...current.caucuses, [caucusMode]: { duration: seconds, extension: Math.max(0, seconds - 1) } } })); }} compact />
-              <div className="caucus-main-controls"><button onClick={() => { setCaucusRemaining(activeCaucus.duration); setCaucusRunning(false); }}>{t("reset")}</button><button className="caucus-primary" onClick={() => setCaucusRunning((value) => !value)}>{t(caucusRunning ? "pause" : "startCaucus")}</button><button className="caucus-extension-button" onClick={() => { const extension = Math.max(0, activeCaucus.duration - 1); setCaucusRemaining(extension); setCaucusRunning(false); update((current) => ({ ...current, caucuses: { ...current.caucuses, [caucusMode]: { ...current.caucuses[caucusMode], extension } }, events: [{ key: "eventCaucusModeExtended", values: { mode: t(caucusMode === "moderated" ? "moderatedCaucus" : "simpleCaucus"), time: formatTime(extension) } }, ...current.events] })); }}>{t("applyMinusOne")}</button><button onClick={() => { setCaucusRemaining(0); setCaucusRunning(false); }}>{t("finish")}</button></div>
+              <div className="caucus-main-controls"><button onClick={() => { setCaucusRemaining(activeCaucus.duration); setCaucusRunning(false); }}>{t("reset")}</button><button className="caucus-primary" onClick={() => setCaucusRunning((value) => !value)}>{t(caucusRunning ? "pause" : "startCaucus")}</button><button className="caucus-extension-button" onClick={() => { const extension = Math.max(0, activeCaucus.duration - 1); setCaucusRemaining(extension); setCaucusRunning(false); update((current) => ({ ...current, caucuses: { ...current.caucuses, [caucusMode]: { ...current.caucuses[caucusMode], extension } }, events: [{ key: "eventCaucusModeExtended", values: { mode: t(caucusMode === "moderated" ? "moderatedCaucus" : "simpleCaucus"), modeId: caucusMode, time: formatTime(extension) } }, ...current.events] })); }}>{t("applyMinusOne")}</button><button onClick={() => { setCaucusRemaining(0); setCaucusRunning(false); }}>{t("finish")}</button></div>
             </div>
           </section>
         )}
 
-        {activeTab === "motions" && (
+        {features.motionsAndAppeals && activeTab === "motions" && (
           <section className="module-panel motions-module">
             <div className="module-title-row"><div><span className="section-kicker">{t("immediateVote")}</span><h2>{t("appealsToChair")}</h2></div><span className="rule-tag">{t("onlyPresentAndVoting")}</span></div>
             {state.vote.status === "active" && currentAppealVoter ? <div className="nominal-vote procedural-vote"><div className="vote-progress">{t("voteProgress", { current: state.vote.currentIndex + 1, total: state.vote.queue.length })}</div>{currentAppealVoter.flagUrl && <Image src={currentAppealVoter.flagUrl} alt="" width={96} height={64} unoptimized />}<span>{t("castingVote")}</span><h2>{currentAppealVoter.name}</h2><p>{state.vote.label}</p><div className="vote-actions"><button onClick={() => castAppealVote("for")}>{t("inFavor")}</button><button onClick={() => castAppealVote("against")}>{t("against")}</button></div></div> : state.vote.status === "complete" ? <div className="vote-result procedural-vote"><span className="section-kicker">{t("voteComplete")}</span><h2>{state.vote.label}</h2><div className="vote-counts vote-counts-two"><div><strong>{appealVoteCounts.for}</strong><span>{t("inFavor")}</span></div><div><strong>{appealVoteCounts.against}</strong><span>{t("against")}</span></div></div><button onClick={() => update((current) => ({ ...current, vote: { label: "", context: "appeal", queue: [], currentIndex: 0, ballots: {}, status: "idle" } }))}>{t("closeProceduralVote")}</button></div> : <>
@@ -475,11 +534,11 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
 
         {activeTab === "voting" && (
           <section className="module-panel voting-module final-voting-module">
-            <div className="module-title-row"><div><span className="section-kicker">{t("onlyPresentAndVoting")}</span><h2>{t("finalVoting")}</h2></div><a className="projector-link" href={`/comite/${sessionKey}/pantalla?nombre=${encodeURIComponent(committee.name)}`} target="_blank" rel="noreferrer">{t("openPublicScreen")}</a></div>
-            {state.finalVote.phase === "idle" && <div className="vote-start final-vote-start"><p>{t("finalVotingIntro")}</p><div className="final-topic-card"><span>{t("finalVoteTopic")}</span><strong>{state.topic}</strong></div><p>{t("eligibleCountries", { count: eligibleVoters.length })}</p><button className="primary-button" disabled={!state.topic || eligibleVoters.length === 0} onClick={beginFinalVote}>{t("startFinalVote", { count: eligibleVoters.length })}</button>{eligibleVoters.length === 0 && <button className="inline-link" onClick={() => setActiveTab("rollcall")}>{t("goToRollCall")}</button>}</div>}
+            <div className="module-title-row"><div><span className="section-kicker">{t("onlyPresentAndVoting")}</span><h2>{t("finalVoting")}</h2></div><a className="projector-link" href={`/comite/${sessionKey}/pantalla?nombre=${encodeURIComponent(committeeName)}`} target="_blank" rel="noreferrer">{t("openPublicScreen")}</a></div>
+            {state.finalVote.phase === "idle" && <div className="vote-start final-vote-start"><p>{t("finalVotingIntro")}</p><div className="final-topic-card"><span>{t("finalVoteTopic")}</span><strong>{displayedTopic}</strong></div><p>{t("eligibleCountries", { count: eligibleVoters.length })}</p><button className="primary-button" disabled={!state.topic || eligibleVoters.length === 0} onClick={beginFinalVote}>{t("startFinalVote", { count: eligibleVoters.length })}</button>{eligibleVoters.length === 0 && <button className="inline-link" onClick={() => setActiveTab("rollcall")}>{t("goToRollCall")}</button>}</div>}
             {(state.finalVote.phase === "round-one" || state.finalVote.phase === "round-two" || state.finalVote.phase === "round-three") && finalVoteParticipant && <div className="nominal-vote final-vote-stage">
               <div className="vote-progress">{t("roundProgress", { round: t(state.finalVote.phase === "round-one" ? "finalRoundOne" : state.finalVote.phase === "round-two" ? "finalRoundTwo" : "finalRoundThree"), current: state.finalVote.currentIndex + 1, total: state.finalVote.queue.length })}</div>
-              {finalVoteParticipant.flagUrl && <Image src={finalVoteParticipant.flagUrl} alt="" width={96} height={64} unoptimized />}<span>{t("castingVote")}</span><h2>{finalVoteParticipant.name}</h2><p>{state.finalVote.label}</p>{(state.warnings[finalVoteParticipant.id] ?? 0) > 0 && <strong className="warning-badge">{disciplinaryLabel(state.warnings[finalVoteParticipant.id])}</strong>}
+              {finalVoteParticipant.flagUrl && <Image src={finalVoteParticipant.flagUrl} alt="" width={96} height={64} unoptimized />}<span>{t("castingVote")}</span><h2>{representationFullName(finalVoteParticipant, language)}</h2><p>{displayedTopic || state.finalVote.label}</p>{(state.warnings[finalVoteParticipant.id] ?? 0) > 0 && <strong className="warning-badge">{disciplinaryLabel(state.warnings[finalVoteParticipant.id])}</strong>}
               <div className={`vote-actions final-vote-actions ${state.finalVote.phase === "round-two" ? "five-options" : ""}`}><button onClick={() => recordFinalVote("for")}>{t("inFavor")}</button><button onClick={() => recordFinalVote("against")}>{t("against")}</button>{state.finalVote.phase !== "round-three" && <button onClick={() => recordFinalVote("abstain")}>{t("abstention")}</button>}{state.finalVote.phase === "round-two" && <><button onClick={() => recordFinalVote("for-explanation")}>{t("forWithExplanation")}</button><button onClick={() => recordFinalVote("against-explanation")}>{t("againstWithExplanation")}</button></>}</div>
             </div>}
             {(state.finalVote.phase === "round-one-complete" || state.finalVote.phase === "round-two-complete" || state.finalVote.phase === "explanations-complete") && <div className="final-vote-transition">
@@ -489,12 +548,12 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
               <div className="stage-divider" aria-hidden="true"><span>✓</span><i /><span>{state.finalVote.phase === "round-one-complete" ? "2" : "3"}</span></div>
               <button className="primary-button" onClick={() => update((current) => ({ ...current, finalVote: advanceFinalVoteStage(current.finalVote) }))}>{t(state.finalVote.phase === "round-one-complete" ? "beginSecondRound" : state.finalVote.phase === "round-two-complete" && state.finalVote.explanationQueue.length > 0 ? "beginExplanations" : "beginThirdRound")}</button>
             </div>}
-            {state.finalVote.phase === "explanations" && finalVoteParticipant && <div className="nominal-vote explanation-stage"><div className="vote-progress">{t("explanationProgress", { current: state.finalVote.explanationIndex + 1, total: state.finalVote.explanationQueue.length })}</div>{finalVoteParticipant.flagUrl && <Image src={finalVoteParticipant.flagUrl} alt="" width={96} height={64} unoptimized />}<span>{t("explainingVote")}</span><h2>{finalVoteParticipant.name}</h2><p>{t(state.finalVote.roundTwo[finalVoteParticipant.id] === "for-explanation" ? "forWithExplanation" : "againstWithExplanation")}</p>{(state.warnings[finalVoteParticipant.id] ?? 0) > 0 && <strong className="warning-badge">{disciplinaryLabel(state.warnings[finalVoteParticipant.id])}</strong>}<button className="primary-button explanation-next" onClick={() => update((current) => ({ ...current, finalVote: advanceFinalVoteExplanation(current.finalVote) }))}>{t(state.finalVote.explanationIndex < state.finalVote.explanationQueue.length - 1 ? "nextExplanation" : "finishExplanations")}</button></div>}
-            {state.finalVote.phase === "complete" && <div className="vote-result final-vote-result"><span className="section-kicker">{t("finalVoteResult")}</span><h2>{state.finalVote.label}</h2><div className="vote-counts vote-counts-two"><div><strong>{finalVoteCounts.for}</strong><span>{t("inFavor")}</span></div><div><strong>{finalVoteCounts.against}</strong><span>{t("against")}</span></div></div><div className="final-vote-audit">{state.finalVote.queue.map((participantId) => { const participant = state.participants.find((item) => item.id === participantId); if (!participant) return null; const warnings = state.warnings[participantId] ?? 0; return <div key={participantId}><span>{participant.name}</span><strong>{t(state.finalVote.roundThree[participantId] === "for" ? "inFavor" : "against")}</strong>{warnings > 0 && <em>{disciplinaryLabel(warnings)}</em>}</div>; })}</div><button onClick={() => update((current) => ({ ...current, finalVote: createInitialFinalVoteState() }))}>{t("resetFinalVote")}</button></div>}
+            {state.finalVote.phase === "explanations" && finalVoteParticipant && <div className="nominal-vote explanation-stage"><div className="vote-progress">{t("explanationProgress", { current: state.finalVote.explanationIndex + 1, total: state.finalVote.explanationQueue.length })}</div>{finalVoteParticipant.flagUrl && <Image src={finalVoteParticipant.flagUrl} alt="" width={96} height={64} unoptimized />}<span>{t("explainingVote")}</span><h2>{representationFullName(finalVoteParticipant, language)}</h2><p>{t(state.finalVote.roundTwo[finalVoteParticipant.id] === "for-explanation" ? "forWithExplanation" : "againstWithExplanation")}</p>{(state.warnings[finalVoteParticipant.id] ?? 0) > 0 && <strong className="warning-badge">{disciplinaryLabel(state.warnings[finalVoteParticipant.id])}</strong>}<button className="primary-button explanation-next" onClick={() => update((current) => ({ ...current, finalVote: advanceFinalVoteExplanation(current.finalVote) }))}>{t(state.finalVote.explanationIndex < state.finalVote.explanationQueue.length - 1 ? "nextExplanation" : "finishExplanations")}</button></div>}
+            {state.finalVote.phase === "complete" && <div className="vote-result final-vote-result"><span className="section-kicker">{t("finalVoteResult")}</span><h2>{displayedTopic || state.finalVote.label}</h2><div className="vote-counts vote-counts-two"><div><strong>{finalVoteCounts.for}</strong><span>{t("inFavor")}</span></div><div><strong>{finalVoteCounts.against}</strong><span>{t("against")}</span></div></div><div className="final-vote-audit">{state.finalVote.queue.map((participantId) => { const participant = state.participants.find((item) => item.id === participantId); if (!participant) return null; const warnings = state.warnings[participantId] ?? 0; return <div key={participantId}><span>{representationFullName(participant, language)}</span><strong>{t(state.finalVote.roundThree[participantId] === "for" ? "inFavor" : "against")}</strong>{warnings > 0 && <em>{disciplinaryLabel(warnings)}</em>}</div>; })}</div><button onClick={() => update((current) => ({ ...current, finalVote: createInitialFinalVoteState() }))}>{t("resetFinalVote")}</button></div>}
           </section>
         )}
 
-        {activeTab === "log" && <section className="module-panel"><div className="module-title-row"><div><span className="section-kicker">{t("localRecord")}</span><h2>{t("log")}</h2></div></div><ul className="event-log">{state.events.length === 0 ? <li className="empty-state">{t("noEvents")}</li> : state.events.map((event, index) => <li key={index}><time>{String(index + 1).padStart(2, "0")}</time><span>{typeof event === "string" ? event : t(event.key, event.values)}</span></li>)}</ul></section>}
+        {activeTab === "log" && <section className="module-panel"><div className="module-title-row"><div><span className="section-kicker">{t("localRecord")}</span><h2>{t("log")}</h2></div></div><ul className="event-log">{state.events.length === 0 ? <li className="empty-state">{t("noEvents")}</li> : state.events.map((event, index) => <li key={index}><time>{String(index + 1).padStart(2, "0")}</time><span>{typeof event === "string" ? event : t(event.key, localizedEventValues(event))}</span></li>)}</ul></section>}
       </div>
     </main>
   );

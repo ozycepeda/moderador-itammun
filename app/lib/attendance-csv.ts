@@ -1,5 +1,6 @@
-import type { Committee } from "./committees";
+import { committeeDisplayAbbreviation, committeeDisplayName, type Committee } from "./committees";
 import type { Language } from "./i18n";
+import { representationFullName } from "./itammun-api";
 import type { AttendanceStatus, SessionState } from "./session-state";
 import { getDisciplinaryCounts } from "./session-state";
 
@@ -33,13 +34,13 @@ export function buildAttendanceCsv({ committee, state, language, exportedAt = ne
     const discipline = getDisciplinaryCounts(state.warnings[participant.id] ?? 0);
     const status = state.attendance[participant.id] ?? "pending";
     return [
-      committee.name,
-      committee.abbreviation,
+      committeeDisplayName(committee, language),
+      committeeDisplayAbbreviation(committee, language),
       state.session.title,
       state.session.id,
       state.session.startedAt,
       exportedAt,
-      participant.name,
+      representationFullName(participant, language),
       statusLabels[language][status],
       yesNo(assigned.has(participant.id), language),
       yesNo(participant.observer || status === "observer", language),

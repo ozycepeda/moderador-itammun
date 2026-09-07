@@ -13,9 +13,9 @@ export default async function ProjectorPage({ params, searchParams }: {
   if (!committee && !isBlank) notFound();
 
   const resolved = committee ?? {
-    id: slug, slug, abbreviation: query.nombre || "Nuevo comité", name: query.nombre || "Nuevo comité",
+    id: slug, slug, abbreviation: query.nombre || "", name: query.nombre || "",
     language: "ES" as const, level: "Intermedio" as const, representationType: "delegacion" as const,
-    representationsCount: 0, secretariat: "Lienzo en blanco", color: "#C2943D", darkColor: "#2E2812",
+    representationsCount: 0, secretariat: "", color: "#C2943D", darkColor: "#2E2812",
   };
   return <ProjectorView committee={resolved} sessionKey={slug} />;
 }

@@ -6,6 +6,7 @@ import {
   type FinalVoteRoundTwoChoice,
   type SessionEvent,
   type SessionState,
+  type SpeakerYieldDestination,
   type SpeakerQueueItem,
   type VoteChoice,
 } from "./session-state";
@@ -68,6 +69,7 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
   const moderatedDuration = stored.caucuses?.moderated?.duration ?? stored.caucusDuration ?? fallback.caucuses.moderated.duration;
   const moderatedExtension = stored.caucuses?.moderated?.extension ?? stored.caucusExtension ?? Math.max(0, moderatedDuration - 1);
   const storedSession = stored.session;
+  const validYields = new Set<SpeakerYieldDestination>(["none", "chair", "next", "questions"]);
   const session = storedSession && typeof storedSession === "object"
     ? {
         id: typeof storedSession.id === "string" && storedSession.id ? storedSession.id : crypto.randomUUID(),
@@ -83,13 +85,24 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
   return {
     ...fallback,
     ...stored,
-    schemaVersion: 4,
+    schemaVersion: 5,
     session,
+    topicId: typeof stored.topicId === "string" ? stored.topicId : "",
+    topicByLanguage: stored.topicByLanguage && typeof stored.topicByLanguage === "object"
+      ? stored.topicByLanguage
+      : undefined,
     participants,
     assignedParticipantIds: stored.assignedParticipantIds ?? storedParticipants.map((participant) => participant.id),
     attendance,
     speakers: normalizeQueue(stored.speakers, participants),
     questionQueue: normalizeQueue(stored.questionQueue, participants),
+    currentQuestionerParticipantId: typeof stored.currentQuestionerParticipantId === "string"
+      ? stored.currentQuestionerParticipantId
+      : participants.find((participant) => participant.name === stored.currentQuestioner)?.id ?? "",
+    currentSpeakerYield: validYields.has(stored.currentSpeakerYield as SpeakerYieldDestination)
+      ? stored.currentSpeakerYield as SpeakerYieldDestination
+      : "none",
+    pendingDonationSeconds: typeof stored.pendingDonationSeconds === "number" ? Math.max(0, stored.pendingDonationSeconds) : 0,
     warnings: Object.fromEntries(Object.entries(stored.warnings ?? {}).filter((entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] >= 0)),
     caucuses: {
       moderated: { duration: moderatedDuration, extension: moderatedExtension },

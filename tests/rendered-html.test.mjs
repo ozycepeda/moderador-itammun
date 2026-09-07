@@ -53,10 +53,10 @@ test("renders setup and projector routes", async () => {
   const setup = await renderProtected("/comite/onu-mujeres/setup");
   assert.equal(setup.status, 200);
   const setupHtml = await setup.text();
-  assert.match(setupHtml, /Marca los cupos asignados al inicio/);
+  assert.match(setupHtml, /Confirma los cupos ocupados al inicio/);
   assert.match(setupHtml, /aria-label="Idioma \/ Language"/);
   assert.doesNotMatch(setupHtml, /Cupo asignado|Disponible/);
-  assert.match(setupHtml, /Santa Sede/);
+  assert.match(setupHtml, /Catálogo de ITAMMUN actualizado|No fue posible cargar el catálogo de ITAMMUN/);
   assert.match(setupHtml, /Título de la sesión/);
   assert.doesNotMatch(setupHtml, /Tema de la sesión/);
 
@@ -68,6 +68,8 @@ test("renders setup and projector routes", async () => {
   assert.match(consoleHtml, /Observador/);
   assert.match(consoleHtml, /Llamadas de atención/);
   assert.match(consoleHtml, /Votación final/);
+  assert.match(consoleHtml, /Finalizar sesión/);
+  assert.doesNotMatch(consoleHtml, />Mociones</);
   assert.match(consoleHtml, /Pendiente · defínelo/);
   assert.doesNotMatch(consoleHtml, /Tiempo por orador/);
 

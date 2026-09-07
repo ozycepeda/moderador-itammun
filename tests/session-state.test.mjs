@@ -4,9 +4,12 @@ import test from "node:test";
 import {
   advanceFinalVoteExplanation,
   advanceFinalVoteStage,
+  advanceToNextSpeaker,
+  applySpeakerYield,
   castFinalVote,
   createInitialState,
   getDisciplinaryCounts,
+  isParticipantInDebate,
   startFinalVote,
 } from "../app/lib/session-state.ts";
 import { normalizeSessionState } from "../app/lib/session-migration.ts";
@@ -61,7 +64,7 @@ test("migrates version two sessions without losing debate state", () => {
     warnings: { mx: 4 },
   }, fallback);
 
-  assert.equal(migrated.schemaVersion, 4);
+  assert.equal(migrated.schemaVersion, 5);
   assert.equal(migrated.topic, "Migración");
   assert.equal(migrated.speakers[0].participantId, "mx");
   assert.equal(migrated.caucuses.moderated.duration, 420);
@@ -69,9 +72,46 @@ test("migrates version two sessions without losing debate state", () => {
   assert.equal(migrated.warnings.mx, 4);
 });
 
-test("converts every three warnings into one fault", () => {
+test("converts every fourth warning into one fault", () => {
   assert.deepEqual(getDisciplinaryCounts(0), { totalWarnings: 0, activeWarnings: 0, faults: 0 });
-  assert.deepEqual(getDisciplinaryCounts(2), { totalWarnings: 2, activeWarnings: 2, faults: 0 });
-  assert.deepEqual(getDisciplinaryCounts(3), { totalWarnings: 3, activeWarnings: 0, faults: 1 });
-  assert.deepEqual(getDisciplinaryCounts(7), { totalWarnings: 7, activeWarnings: 1, faults: 2 });
+  assert.deepEqual(getDisciplinaryCounts(3), { totalWarnings: 3, activeWarnings: 3, faults: 0 });
+  assert.deepEqual(getDisciplinaryCounts(4), { totalWarnings: 4, activeWarnings: 0, faults: 1 });
+  assert.deepEqual(getDisciplinaryCounts(9), { totalWarnings: 9, activeWarnings: 1, faults: 2 });
+});
+
+test("only allows participants who are in the debate to join queues", () => {
+  assert.equal(isParticipantInDebate("present"), true);
+  assert.equal(isParticipantInDebate("present-voting"), true);
+  assert.equal(isParticipantInDebate("observer"), true);
+  assert.equal(isParticipantInDebate("absent"), false);
+  assert.equal(isParticipantInDebate("pending"), false);
+  assert.equal(isParticipantInDebate(undefined), false);
+});
+
+test("preselects only occupied catalog representations", () => {
+  const state = createInitialState([
+    { id: "paid", name: "Pagado", observer: false, status: "occupied" },
+    { id: "available", name: "Disponible", observer: false, status: "available" },
+  ]);
+  assert.deepEqual(state.assignedParticipantIds, ["paid"]);
+});
+
+test("keeps the current speaker visible after yielding and advances only on request", () => {
+  const state = createInitialState([]);
+  state.currentSpeaker = "México";
+  state.currentSpeakerParticipantId = "mx";
+  state.speakers = [{ id: "next", participantId: "fr", name: "Francia", bonusSeconds: 0 }];
+
+  const yielded = applySpeakerYield(state, "next", 17);
+  assert.equal(yielded.currentSpeaker, "México");
+  assert.equal(yielded.currentSpeakerYield, "next");
+  assert.equal(yielded.pendingDonationSeconds, 17);
+  assert.equal(yielded.speakers.length, 1);
+
+  const advanced = advanceToNextSpeaker(yielded);
+  assert.equal(advanced.currentSpeaker, "Francia");
+  assert.equal(advanced.currentSpeakerAllottedTime, 77);
+  assert.equal(advanced.currentSpeakerYield, "none");
+  assert.equal(advanced.pendingDonationSeconds, 0);
+  assert.equal(advanced.speakers.length, 0);
 });

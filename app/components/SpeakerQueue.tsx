@@ -21,8 +21,9 @@ import { CSS } from "@dnd-kit/utilities";
 import type { SessionEvent, SpeakerQueueItem } from "../lib/session-state";
 import { useLanguage } from "./LanguageProvider";
 
-function SortableSpeaker({ item, index, total, onMove, onRemove }: {
+function SortableSpeaker({ item, label, index, total, onMove, onRemove }: {
   item: SpeakerQueueItem;
+  label: string;
   index: number;
   total: number;
   onMove: (from: number, to: number) => void;
@@ -34,13 +35,13 @@ function SortableSpeaker({ item, index, total, onMove, onRemove }: {
 
   return (
     <li ref={setNodeRef} style={style} className={isDragging ? "is-dragging" : ""}>
-      <button className="drag-handle" aria-label={t("reorderSpeaker", { name: item.name })} {...attributes} {...listeners}>⠿</button>
+      <button className="drag-handle" aria-label={t("reorderSpeaker", { name: label })} {...attributes} {...listeners}>⠿</button>
       <span className="queue-position">{index + 1}</span>
-      <strong>{item.name}{Boolean(item.bonusSeconds) && <small className="queue-bonus">{t("donatedTime", { time: formatQueueTime(item.bonusSeconds ?? 0) })}</small>}</strong>
+      <strong>{label}{Boolean(item.bonusSeconds) && <small className="queue-bonus">{t("donatedTime", { time: formatQueueTime(item.bonusSeconds ?? 0) })}</small>}</strong>
       <div className="queue-actions">
-        <button disabled={index === 0} aria-label={t("moveSpeakerUp", { name: item.name })} onClick={() => onMove(index, index - 1)}>↑</button>
-        <button disabled={index === total - 1} aria-label={t("moveSpeakerDown", { name: item.name })} onClick={() => onMove(index, index + 1)}>↓</button>
-        <button aria-label={t("removeSpeaker", { name: item.name })} onClick={() => onRemove(item.id)}>{t("remove")}</button>
+        <button disabled={index === 0} aria-label={t("moveSpeakerUp", { name: label })} onClick={() => onMove(index, index - 1)}>↑</button>
+        <button disabled={index === total - 1} aria-label={t("moveSpeakerDown", { name: label })} onClick={() => onMove(index, index + 1)}>↓</button>
+        <button aria-label={t("removeSpeaker", { name: label })} onClick={() => onRemove(item.id)}>{t("remove")}</button>
       </div>
     </li>
   );
@@ -51,10 +52,11 @@ function formatQueueTime(seconds: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-export function SpeakerQueue({ items, onChange, emptyText }: {
+export function SpeakerQueue({ items, onChange, emptyText, getLabel = (item) => item.name }: {
   items: SpeakerQueueItem[];
   onChange: (items: SpeakerQueueItem[], event: SessionEvent) => void;
   emptyText?: string;
+  getLabel?: (item: SpeakerQueueItem) => string;
 }) {
   const { t } = useLanguage();
   const sensors = useSensors(
@@ -66,7 +68,7 @@ export function SpeakerQueue({ items, onChange, emptyText }: {
   function move(from: number, to: number) {
     if (to < 0 || to >= items.length || from === to) return;
     const next = arrayMove(items, from, to);
-    onChange(next, { key: "eventSpeakerMoved", values: { name: items[from].name, position: to + 1 } });
+    onChange(next, { key: "eventSpeakerMoved", values: { name: getLabel(items[from]), participantId: items[from].participantId ?? "", position: to + 1 } });
   }
 
   function dragEnd(event: DragEndEvent) {
@@ -85,10 +87,11 @@ export function SpeakerQueue({ items, onChange, emptyText }: {
             <SortableSpeaker
               key={item.id}
               item={item}
+              label={getLabel(item)}
               index={index}
               total={items.length}
               onMove={move}
-              onRemove={(id) => onChange(items.filter((entry) => entry.id !== id), { key: "eventSpeakerRemoved", values: { name: item.name } })}
+              onRemove={(id) => onChange(items.filter((entry) => entry.id !== id), { key: "eventSpeakerRemoved", values: { name: getLabel(item), participantId: item.participantId ?? "" } })}
             />
           ))}
         </ol>

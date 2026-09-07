@@ -15,6 +15,7 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
   const initialStateRef = useRef(initialState);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const receivedFromChannelRef = useRef(false);
+  const closedRef = useRef(false);
 
   useEffect(() => {
     const storedSession = window.localStorage.getItem(sessionStorageKey(sessionKey));
@@ -44,6 +45,13 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
     const channel = new BroadcastChannel(`itammun:${sessionKey}`);
     channelRef.current = channel;
     channel.onmessage = (event) => {
+      if (event.data && typeof event.data === "object" && event.data.type === "itammun:session-closed") {
+        closedRef.current = true;
+        window.localStorage.removeItem(sessionStorageKey(sessionKey));
+        window.localStorage.removeItem(setupStorageKey(sessionKey));
+        window.location.replace("/");
+        return;
+      }
       receivedFromChannelRef.current = true;
       setState(normalizeSessionState(event.data, initialStateRef.current));
     };
@@ -54,7 +62,7 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
   }, [sessionKey]);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || closedRef.current) return;
     window.localStorage.setItem(sessionStorageKey(sessionKey), JSON.stringify(state));
     if (receivedFromChannelRef.current) {
       receivedFromChannelRef.current = false;
@@ -67,5 +75,12 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
     setState((current) => recipe(current));
   }, []);
 
-  return { state, update };
+  const closeSession = useCallback(() => {
+    closedRef.current = true;
+    channelRef.current?.postMessage({ type: "itammun:session-closed" });
+    window.localStorage.removeItem(sessionStorageKey(sessionKey));
+    window.localStorage.removeItem(setupStorageKey(sessionKey));
+  }, [sessionKey]);
+
+  return { state, update, closeSession };
 }

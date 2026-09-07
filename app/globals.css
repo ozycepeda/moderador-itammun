@@ -86,6 +86,7 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .sync-connecting { background: #223c34; color: #aed1c2; }
 .secondary-button, .primary-button, .primary-controls button, .topic-strip button, .full-button { min-height: 40px; padding: 0 .9rem; border: 1px solid currentColor; background: transparent; color: inherit; font-size: .74rem; font-weight: 750; }
 .console-header .secondary-button { border-color: #ffffff55; color: white; }
+.console-header .finish-session-button { border-color: #e6aaa4; color: #ffd8d4; }
 .topic-strip { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; min-height: 88px; padding: 1rem clamp(1rem, 3vw, 3rem); background: #f3e9d0; border-bottom: 1px solid #dfcfa8; }
 .topic-strip.topic-ready { background: color-mix(in srgb, var(--committee-color) 9%, white); border-color: color-mix(in srgb, var(--committee-color), white 65%); }
 .topic-strip > div { display: grid; gap: .35rem; min-width: 0; }
@@ -121,6 +122,11 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .yield-panel > div { display: flex; justify-content: center; flex-wrap: wrap; gap: .55rem; }
 .yield-panel button { min-height: 44px; padding: 0 .8rem; border: 1px solid #ffffff55; background: transparent; color: white; font-size: .7rem; font-weight: 800; }
 .yield-panel button:disabled { cursor: not-allowed; opacity: .3; }
+.yield-status { width: min(100%, 520px); display: grid; justify-items: center; gap: .45rem; margin-top: 1.4rem; padding: 1rem; border: 1px solid #ffffff42; background: #ffffff0d; }
+.yield-status strong { color: color-mix(in srgb, var(--committee-color), white 28%); font-size: .78rem; }
+.yield-status span { max-width: 420px; color: #ffffffb8; font-size: .68rem; line-height: 1.5; }
+.yield-status button { min-height: 42px; margin-top: .25rem; padding: 0 .8rem; border: 1px solid #ffffff55; background: transparent; color: white; font-size: .7rem; font-weight: 800; }
+.zero-time-badge { margin-top: 2rem; padding: .65rem 1rem; border: 1px solid color-mix(in srgb, var(--committee-color), white 30%); border-radius: 999px; color: color-mix(in srgb, var(--committee-color), white 25%); font-size: .72rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
 .queue-panel, .extension-panel { padding: clamp(1.25rem, 3vw, 2.5rem); }
 .panel-heading, .module-title-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--line); }
 .panel-heading h2, .module-title-row h2, .extension-panel h2, .placeholder-module h2 { margin: .25rem 0 0; font-size: 1.65rem; font-weight: 550; }
@@ -243,7 +249,8 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .attendance-row { grid-template-columns: minmax(220px, 1fr) minmax(520px, auto); padding: .65rem .5rem; }
 .attendance-person { display: grid; grid-template-columns: 34px minmax(120px, auto) 1fr; align-items: center; gap: .65rem; }
 .attendance-person img { width: 32px; height: 22px; object-fit: cover; border: 1px solid var(--line); }
-.attendance-person span { font-size: .84rem; font-weight: 700; }
+.attendance-person span { display: grid; gap: .15rem; font-size: .84rem; font-weight: 700; }
+.attendance-person span small { color: var(--muted); font-size: .65rem; font-weight: 600; }
 .attendance-person em { color: var(--muted); font-size: .62rem; font-style: normal; }
 .attendance-buttons { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .4rem; }
 .attendance-button, .attendance-clear { min-height: 44px; padding: 0 .72rem; border: 1px solid currentColor; border-radius: 4px; font-size: .68rem; font-weight: 800; }
@@ -327,6 +334,12 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .session-title-field { margin-bottom: 2rem; padding: 1.2rem; border-left: 4px solid var(--committee-color); background: color-mix(in srgb, var(--committee-color) 7%, white); }
 .session-title-field input { margin-top: .45rem; background: white; }
 .session-title-field p { margin: .5rem 0 0; color: var(--muted); font-size: .7rem; }
+.catalog-status { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .25rem 1rem; margin-bottom: 1.5rem; padding: 1rem 1.1rem; border: 1px solid var(--line); }
+.catalog-status strong { font-size: .78rem; }
+.catalog-status span { color: var(--muted); font-size: .7rem; }
+.catalog-status button { grid-column: 2; grid-row: 1 / span 2; min-height: 40px; padding: 0 .8rem; border: 1px solid currentColor; background: transparent; color: inherit; font-size: .7rem; font-weight: 800; }
+.catalog-status-live { border-color: #b8dac7; background: #edf7f1; color: var(--success); }
+.catalog-status-error { border-color: #e6aaa4; background: #fff1ef; color: var(--danger); }
 .setup-panel h2 { margin: .35rem 0 1.5rem; font-size: 1.75rem; font-weight: 550; }
 .setup-panel label { display: grid; gap: .45rem; color: var(--muted); font-size: .73rem; font-weight: 750; }
 .setup-panel select, .setup-panel input { width: 100%; min-height: 44px; padding: 0 .8rem; border: 1px solid var(--line); background: var(--paper); color: var(--itam-ink); }
@@ -337,10 +350,11 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .catalog-tools { display: grid; grid-template-columns: 1fr auto auto; gap: .5rem; margin-bottom: 1rem; }
 .catalog-tools button, .custom-participant-form button, .custom-participants button { min-height: 42px; padding: 0 .75rem; border: 1px solid var(--line); background: white; color: var(--itam-ink); font-size: .7rem; font-weight: 750; }
 .setup-country-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
-.setup-country-row { min-height: 58px; display: grid !important; grid-template-columns: 20px 32px 1fr; align-items: center; gap: .8rem !important; padding: .3rem .75rem; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); cursor: pointer; }
+.setup-country-row { min-height: 58px; display: grid !important; grid-template-columns: 20px 32px minmax(0, 1fr) auto; align-items: center; gap: .8rem !important; padding: .3rem .75rem; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); cursor: pointer; }
 .setup-country-row input { width: 16px; min-height: 16px; accent-color: var(--committee-color); }
 .setup-country-row img, .flag-placeholder { width: 28px; height: 19px; object-fit: cover; border: 1px solid var(--line); }
 .setup-country-row > span { color: var(--itam-ink); font-size: .9rem; }
+.setup-country-row > em { color: var(--muted); font-size: .58rem; font-style: normal; text-transform: uppercase; }
 .custom-participant-form { margin-top: 1.4rem; }
 .custom-participant-form > div { display: grid; grid-template-columns: 1fr auto; gap: .5rem; margin-top: .45rem; }
 .custom-participant-form button { border-color: var(--committee-color); background: var(--committee-color); color: var(--committee-dark); }
@@ -379,7 +393,7 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
   .committee-heading span { display: none; }
   .console-brand > span:last-child { display: none; }
   .console-header .secondary-button { padding: 0 .55rem; }
-  .sharing-tools .secondary-button:nth-of-type(2), .sharing-tools > button.secondary-button { display: none; }
+  .sharing-tools .share-button { display: none; }
   .language-switcher button { min-width: 32px; padding-inline: .35rem; }
   .landing-actions .open-access { display: none; }
   .topic-strip form { flex-direction: column; }
@@ -396,6 +410,8 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
   .setup-step { display: none; }
   .catalog-tools { grid-template-columns: 1fr 1fr; }
   .catalog-tools input { grid-column: 1 / -1; }
+  .catalog-status { grid-template-columns: 1fr; }
+  .catalog-status button { grid-column: 1; grid-row: auto; width: 100%; }
   .setup-footer { align-items: stretch; flex-direction: column; }
   .setup-footer .primary-button { width: 100%; }
   .setup-shell { padding-bottom: 135px; }

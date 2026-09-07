@@ -1,10 +1,12 @@
 import type { Representation } from "./itammun-api";
 import type { TranslationKey } from "./i18n";
+import type { LocalizedText } from "./catalog-translations";
 
 export type AttendanceStatus = "pending" | "absent" | "present" | "present-voting" | "observer";
 export type ConsoleTab = "speakers" | "rollcall" | "caucus" | "motions" | "voting" | "log";
 export type VoteChoice = "for" | "against";
 export type CaucusMode = "moderated" | "simple";
+export type SpeakerYieldDestination = "none" | "chair" | "next" | "questions";
 
 export type SpeakerQueueItem = {
   id: string;
@@ -72,9 +74,11 @@ export type SessionMetadata = {
 };
 
 export type SessionState = {
-  schemaVersion: 4;
+  schemaVersion: 5;
   session: SessionMetadata;
   topic: string;
+  topicId: string;
+  topicByLanguage?: LocalizedText;
   participants: Representation[];
   assignedParticipantIds: string[];
   speakers: SpeakerQueueItem[];
@@ -82,9 +86,12 @@ export type SessionState = {
   currentSpeakerParticipantId: string;
   currentSpeakerAllottedTime: number;
   currentSpeakerReceivedDonation: boolean;
+  currentSpeakerYield: SpeakerYieldDestination;
+  pendingDonationSeconds: number;
   speakerTime: number;
   questionQueue: SpeakerQueueItem[];
   currentQuestioner: string;
+  currentQuestionerParticipantId: string;
   attendance: Record<string, AttendanceStatus>;
   warnings: Record<string, number>;
   caucuses: Record<CaucusMode, CaucusState>;
@@ -179,19 +186,24 @@ export function advanceFinalVoteStage(vote: FinalVoteState): FinalVoteState {
 export function createInitialState(representations: Representation[]): SessionState {
   const defaultCaucus = { duration: 600, extension: 599 };
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     session: { id: "", title: "", startedAt: "" },
     topic: "",
+    topicId: "",
+    topicByLanguage: undefined,
     participants: representations,
-    assignedParticipantIds: representations.map((representation) => representation.id),
+    assignedParticipantIds: representations.filter((representation) => representation.status === "occupied").map((representation) => representation.id),
     speakers: [],
     currentSpeaker: "",
     currentSpeakerParticipantId: "",
     currentSpeakerAllottedTime: 60,
     currentSpeakerReceivedDonation: false,
+    currentSpeakerYield: "none",
+    pendingDonationSeconds: 0,
     speakerTime: 60,
     questionQueue: [],
     currentQuestioner: "",
+    currentQuestionerParticipantId: "",
     attendance: Object.fromEntries(representations.map((representation) => [
       representation.id,
       representation.observer ? "observer" : "pending",
@@ -205,11 +217,49 @@ export function createInitialState(representations: Representation[]): SessionSt
   };
 }
 
+export function isParticipantInDebate(status: AttendanceStatus | undefined) {
+  return status === "present" || status === "present-voting" || status === "observer";
+}
+
+export function applySpeakerYield(
+  state: SessionState,
+  destination: Exclude<SpeakerYieldDestination, "none">,
+  remainingSeconds: number,
+) {
+  if (!state.currentSpeaker || remainingSeconds <= 0) return state;
+  return {
+    ...state,
+    currentSpeakerYield: destination,
+    pendingDonationSeconds: destination === "next" ? Math.max(0, remainingSeconds) : 0,
+  };
+}
+
+export function advanceToNextSpeaker(state: SessionState) {
+  const next = state.speakers[0];
+  if (!next) return state;
+  const donatedSeconds = state.currentSpeakerYield === "next" ? state.pendingDonationSeconds : 0;
+  const queuedBonus = next.bonusSeconds ?? 0;
+  const allotted = state.speakerTime + queuedBonus + donatedSeconds;
+  return {
+    ...state,
+    speakers: state.speakers.slice(1),
+    currentSpeaker: next.name,
+    currentSpeakerParticipantId: next.participantId ?? "",
+    currentSpeakerAllottedTime: allotted,
+    currentSpeakerReceivedDonation: donatedSeconds > 0 || queuedBonus > 0,
+    currentSpeakerYield: "none" as const,
+    pendingDonationSeconds: 0,
+    questionQueue: [],
+    currentQuestioner: "",
+    currentQuestionerParticipantId: "",
+  };
+}
+
 export function getDisciplinaryCounts(totalWarnings: number) {
   const total = Math.max(0, Math.floor(totalWarnings));
   return {
     totalWarnings: total,
-    activeWarnings: total % 3,
-    faults: Math.floor(total / 3),
+    activeWarnings: total % 4,
+    faults: Math.floor(total / 4),
   };
 }
