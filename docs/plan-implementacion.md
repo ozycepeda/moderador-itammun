@@ -350,7 +350,19 @@ Decisiones confirmadas para esta versión:
 - Setup exige un título para distinguir las sesiones celebradas durante varios días.
 - Cada sesión guarda UUID, título y fecha de inicio en el estado local versión 4.
 - Pase de lista exporta un CSV UTF-8 con todos los países, estados, cupos, observadores, llamadas acumuladas y faltas.
-- Cada tres llamadas de atención se convierten en una falta; el residuo permanece como warnings activos.
+- Cada cuatro llamadas de atención se convierten en una falta; el residuo permanece como warnings activos.
 - Todo el sitio queda detrás de una contraseña general validada por el Worker mediante secretos de hosting.
 - `ACCESS_MODE=public` permite publicar la aplicación después del evento sin eliminar la puerta de acceso del código.
 - La persistencia central queda fuera de esta iteración; D1 o Node/PostgreSQL podrán consumir posteriormente el mismo modelo de sesión.
+
+## Iteración 5 — catálogo real y simplificación operativa
+
+- El setup obtiene representaciones y tópicos del API público de `itammun.itam.mx`; sólo `occupied` aparece marcado inicialmente.
+- ICJ usa el mismo modelo genérico de representación con nombre de juez y país secundario, ambos disponibles en búsqueda.
+- Las listas de oradores y preguntas aceptan únicamente participantes actualmente en sala.
+- Preguntas ordinarias consumen el remanente del orador; la sesión extraordinaria conserva una cola sin tiempo.
+- Las cesiones mantienen visible al orador hasta pulsar **Siguiente orador**.
+- Mociones y apelaciones quedan desactivadas mediante una bandera de funcionalidad, con su código preservado.
+- **Finalizar sesión** confirma, exporta asistencia, limpia el estado local y vuelve al selector.
+- Catálogo, tópicos, nombres, opciones y bitácora nueva responden al selector global ES/EN.
+- El esquema local sube a versión 5 y migra sesiones anteriores sin perder información.

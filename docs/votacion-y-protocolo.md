@@ -25,14 +25,17 @@ Esta es una decisión operativa de ITAMMUN para esta versión. Aunque algunas re
 
 ## Lista de oradores, preguntas y cesiones
 
-La sesión extraordinaria de preguntas vive dentro de Oradores. Sólo permite elegir países o personas del catálogo de la sesión y utiliza el mismo tiempo configurado para un orador. Su fila es independiente y reordenable.
+La sesión extraordinaria de preguntas vive dentro de Oradores. Sólo permite elegir participantes marcados `Presente`, `Presente y votando` u `Observador`. Su fila es independiente, reordenable y no usa cronómetro, siguiendo el flujo de referencia de MUN Manager.
 
 Cuando un orador termina antes de tiempo puede ceder el remanente:
 
+- a preguntas y respuestas ordinarias, que conservan el remanente y sólo descuentan tiempo mientras responde el orador;
 - a la Mesa, con lo que concluye su intervención; o
 - al siguiente orador, que recibe su tiempo base más el remanente.
 
-Para evitar una cadena indefinida de tiempo donado, quien ya recibió una donación no puede volver a ceder ese remanente al siguiente orador. La cesión a la Mesa sigue disponible.
+Al registrar cualquier cesión, el cronómetro queda detenido o en cero pero el país permanece como orador actual. La consola sólo cambia de país cuando la Mesa pulsa **Siguiente orador**. Para evitar una cadena indefinida, quien ya recibió una donación no puede volver a ceder ese remanente al siguiente orador.
+
+Referencia funcional: [MUN Manager v2](https://munmanager.org/en).
 
 ## Caucus moderado y simple
 
@@ -48,9 +51,9 @@ Referencias generales de procedimiento:
 - [ONU — Reglas de procedimiento para conferencias Modelo ONU](https://www.un.org/en/model-united-nations/rules-procedure)
 - [ONU — Reglas de procedimiento de la Asamblea General](https://www.un.org/en/ga/about/ropga/ropga_plenary.shtml)
 
-## Apelación a una decisión de la Mesa
+## Mociones y apelaciones fuera de esta edición
 
-Las apelaciones siguen separadas de la votación final. La consola registra quién apela y la decisión cuestionada, y abre inmediatamente una votación de `A favor` o `En contra` entre quienes estén `presente y votando` al iniciarla. Si hay más votos a favor, la decisión se revoca; en empate o mayoría en contra, se mantiene.
+Ambos módulos están conservados detrás de `features.motionsAndAppeals=false`, pero no aparecen en la navegación, consola ni pantalla pública. Para reactivarlos en otro evento se cambia esa bandera y se vuelve a validar su protocolo.
 
 Referencia: [ONU — Anexo IV: votación inmediata y carácter no debatible](https://www.un.org/en/ga/about/ropga/ropga_anx4.shtml).
 

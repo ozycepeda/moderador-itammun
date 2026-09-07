@@ -9,11 +9,13 @@ El reporte incluye todos los países o representaciones, incluso los estados `Si
 Las llamadas se conservan como contador acumulado para no perder auditoría:
 
 ```text
-faltas = floor(llamadas acumuladas / 3)
-warnings activos = llamadas acumuladas % 3
+faltas = floor(llamadas acumuladas / 4)
+warnings activos = llamadas acumuladas % 4
 ```
 
 El archivo se genera exclusivamente en el navegador. No se transmite a ITAMMUN, OpenAI ni Cloudflare.
+
+El botón **Finalizar sesión** reutiliza exactamente este exportador. Después de una confirmación explícita descarga el CSV, limpia el setup y el debate locales, informa que el cierre fue exitoso y vuelve al selector de comités. Las demás pestañas del mismo navegador reciben el cierre mediante `BroadcastChannel`.
 
 ## Acceso general
 

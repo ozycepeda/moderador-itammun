@@ -1,8 +1,35 @@
-# Catálogo PostgreSQL de prueba
+# Integración del catálogo de ITAMMUN
 
-## Alcance
+## Fuente activa
 
-`sql/001_catalog_test.sql` crea datos de prueba para validar la futura integración. PostgreSQL sólo será fuente del catálogo; no almacena el debate.
+Moderador no se conecta a phpMyAdmin ni directamente a una base de datos. El servidor de la aplicación consulta por HTTPS el endpoint público de lectura:
+
+```text
+GET https://itammun.itam.mx/api/public/debates/<uuid-del-comité>
+```
+
+Los UUID oficiales viven en `app/lib/committees.ts`. `app/lib/itammun-api.ts` valida y normaliza la respuesta. El setup utiliza `status=occupied` para marcar únicamente los cupos pagados; `available` permanece visible pero sin marcar. El estado del debate nunca se escribe en ese API.
+
+Para cambiar el origen sin modificar código:
+
+```text
+ITAMMUN_API_BASE_URL=https://itammun.itam.mx/api/public
+```
+
+No se deben guardar credenciales de phpMyAdmin, MySQL o PostgreSQL en `.env`, `.dev.vars` ni Git para este flujo. Si en el futuro el API requiere autenticación, el secreto deberá residir sólo en el hosting y la llamada seguirá siendo servidor-servidor.
+
+## Contrato normalizado
+
+`CommitteeDetail` contiene tópicos, representaciones, identificadores ocupados y el estado de la fuente. Cada representación tiene un identificador estable, nombre bilingüe, bandera, tipo y estado de ocupación. Para ICJ, el mismo modelo representa un actor de tipo `judge` con dos etiquetas:
+
+- principal: nombre del juez;
+- secundaria: país representado, traducido por su código de bandera.
+
+Los selectores de oradores y preguntas usan ambas etiquetas, por lo que ICJ puede buscarse por juez o país sin lógica especial en la consola. Si el API falla, el adaptador devuelve `source=unavailable`, lista vacía y una opción de reintento; nunca reemplaza datos reales por el fixture local.
+
+## Fixture PostgreSQL heredado
+
+`sql/001_catalog_test.sql` conserva datos de prueba para desarrollo aislado. PostgreSQL sólo modela el catálogo y no almacena el debate.
 
 Esquema `moderator_test`:
 
@@ -31,18 +58,8 @@ SELECT slug, accent_color, dark_color FROM moderator_test.committees ORDER BY sl
 SELECT name_es, flag_url FROM moderator_test.countries ORDER BY name_es;
 ```
 
-## Adaptador futuro
-
-La interfaz consume `CommitteeDetail` desde `app/lib/itammun-api.ts`. En el siguiente sprint se reemplazará `getTestCommitteeDetail()` por una llamada servidor-servidor a un endpoint de sólo lectura.
-
-Reglas de seguridad:
-
-- nunca exponer `CATALOG_DATABASE_URL` al navegador;
-- usar un usuario PostgreSQL con permiso `SELECT` únicamente sobre vistas autorizadas;
-- validar el `slug` como parámetro, sin interpolarlo en SQL;
-- no escribir asistencia, oradores, tiempos o votos en la base;
-- cachear catálogo, pero tomar un snapshot local al crear el debate.
+El fixture y `app/lib/test-catalog.ts` ya no forman parte de la ruta de producción. Se mantienen para pruebas manuales sin red y como referencia de una posible importación futura.
 
 ## Colores
 
-Los campos `accent_color` y `dark_color` están presentes directamente en PostgreSQL. En el catálogo real deberán mapearse desde una tabla/vista existente o conservarse en una tabla de configuración de este proyecto.
+El API público actual no entrega colores. `app/lib/committees.ts` conserva la paleta visual del moderador como configuración versionada. Si el API expone colores en el futuro, se podrán normalizar junto con el resto del catálogo sin cambiar los componentes.
