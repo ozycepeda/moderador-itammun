@@ -1,27 +1,58 @@
-# Asistencia, CSV y persistencia futura
+# Asistencia centralizada, CSV y D1
 
-## Primera versión
+## Arquitectura implementada
 
-Cada sesión tiene un UUID, un título definido por la administración y una fecha de inicio. El botón **Exportar asistencia CSV** aparece debajo del pase de lista y genera un archivo UTF-8 compatible con Excel.
+El debate activo sigue siendo local a cada navegador. Cada computadora puede operar un comité sin mezclar su cola, cronómetros o votaciones con los demás. Al pulsar **Finalizar sesión**, el navegador construye un snapshot y lo envía al Worker; el Worker valida y guarda el cierre en Cloudflare D1.
 
-El reporte incluye todos los países o representaciones, incluso los estados `Sin registrar` y `Ausente`, además de cupo inicial, observador, llamadas acumuladas, warnings activos y faltas.
+```text
+Navegador de comité
+  └─ POST /api/attendance/sessions/<uuid>/close
+       └─ Worker protegido por contraseña
+            └─ D1: attendance_sessions + attendance_entries
 
-Las llamadas se conservan como contador acumulado para no perder auditoría:
+Administración
+  └─ /admin/asistencia
+       ├─ lista y filtros
+       ├─ detalle inmutable por sesión
+       └─ exportación CSV consolidada
+```
+
+La D1 de `localhost` es una base de desarrollo aislada en `.wrangler/`. Cuando Moderador se publique, todas las computadoras que usen el mismo dominio y despliegue escribirán en la misma D1 central.
+
+## Datos guardados
+
+`attendance_sessions` conserva UUID, título, comité, tópico, inicio, cierre, recepción, expiración, número de participantes y checksum. `attendance_entries` guarda una fila por participante seleccionado en setup, aun cuando su estado sea `Sin registrar`, `Ausente` u `Observador`.
+
+Cada fila incluye:
+
+- nombre principal bilingüe;
+- nombre secundario bilingüe —país representado en ICJ—;
+- código de país, tipo de representación y estado de asistencia;
+- condición de observador;
+- llamadas acumuladas, warnings activos y faltas.
+
+La regla disciplinaria implementada es:
 
 ```text
 faltas = floor(llamadas acumuladas / 4)
 warnings activos = llamadas acumuladas % 4
 ```
 
-El archivo se genera exclusivamente en el navegador. No se transmite a ITAMMUN, OpenAI ni Cloudflare.
+## Cierre confiable e inmutable
 
-El botón **Finalizar sesión** reutiliza exactamente este exportador. Después de una confirmación explícita descarga el CSV, limpia el setup y el debate locales, informa que el cierre fue exitoso y vuelve al selector de comités. Las demás pestañas del mismo navegador reciben el cierre mediante `BroadcastChannel`.
+El UUID de sesión es la llave de idempotencia. Reenviar exactamente el mismo cierre devuelve el recibo existente; intentar reemplazar ese UUID con datos diferentes devuelve conflicto. No existen rutas de edición ni eliminación en el panel.
 
-## Acceso general
+El navegador elimina `localStorage` sólo después de recibir un recibo válido. Si D1 o la red fallan:
 
-El Worker protege todas las rutas antes de renderizar la aplicación. `/acceso` valida la contraseña contra `ACCESS_PIN` y entrega una cookie `HttpOnly`, `SameSite=Strict`, con vigencia de 12 horas. La firma usa un secreto independiente en `ACCESS_SESSION_SECRET`.
+1. la sesión continúa abierta;
+2. se descarga automáticamente el CSV local de respaldo;
+3. la Mesa puede reintentar **Finalizar sesión**.
 
-Configuración:
+Tras un cierre correcto también se descarga el CSV y se vuelve al selector de comités. Así se conserva el respaldo solicitado sin depender de que alguien lo mande a administración.
+
+## Acceso y seguridad
+
+La API de cierre, el panel `/admin/asistencia` y sus APIs administrativas siempre están protegidos por la contraseña general y cookie `HttpOnly`, `SameSite=Strict`. Esto sigue aplicando si después del evento se configura `ACCESS_MODE=public` para el resto de la aplicación.
 
 ```text
 ACCESS_MODE=protected
@@ -29,31 +60,22 @@ ACCESS_PIN=<contraseña compartida>
 ACCESS_SESSION_SECRET=<secreto aleatorio de al menos 32 caracteres>
 ```
 
-Después del evento puede usarse `ACCESS_MODE=public` sin recompilar la aplicación. Los secretos nunca deben incluirse en Git ni en el JavaScript del navegador.
+El POST exige mismo origen, valida tipos, tamaños, estados, UUID de ruta, fechas, duplicados y el cálculo de faltas. Ninguna credencial D1 se entrega al cliente. D1 es una base operativa separada de la fuente institucional de catálogo.
 
-## Persistencia futura: D1 frente a Node/PostgreSQL
+## Retención
 
-### D1
+Cada cierre recibe `expires_at` seis meses después de ser aceptado. Los registros expirados se eliminan al guardar, listar, abrir detalle o exportar. Esto evita depender de un cron para la primera versión; si en el futuro se exige borrado exacto al minuto, deberá añadirse un trigger programado del Worker.
 
-D1 es una base SQL serverless de Cloudflare con semántica SQLite. Se enlaza directamente al Worker, escala a cero y no requiere administrar un servidor. Para activarlo en Sites se cambia el binding lógico `d1` de `.openai/hosting.json`, se define el esquema en `db/schema.ts` y se generan migraciones con Drizzle.
+## API administrativa
 
-Es la opción más sencilla para este proyecto porque la aplicación ya se ejecuta como Worker. La bitácora debe usar tablas separadas para sesiones, estado actual de asistencia y eventos inmutables.
+```text
+GET /api/admin/attendance?committee=<slug>&from=AAAA-MM-DD&to=AAAA-MM-DD
+GET /api/admin/attendance/<uuid>
+GET /api/admin/attendance/export.csv?lang=es|en&committee=<slug>&from=...&to=...
+```
 
-### Node/PostgreSQL
+Todas son de sólo lectura. El CSV consolidado incluye comité, sesión, fechas, participante/juez, país representado, estado y disciplina.
 
-Un servicio Node independiente ofrece mayor control, integración con el PostgreSQL institucional y herramientas de reporte conocidas. También obliga a operar proceso, TLS, actualizaciones, monitoreo, respaldos, pool de conexiones, disponibilidad y despliegues del API.
+## Evolución futura hacia Node/PostgreSQL
 
-El navegador nunca debe conectarse directamente a PostgreSQL. El servicio Node debe exponer un API HTTPS y utilizar un esquema independiente del catálogo, por ejemplo `moderator_operations`.
-
-### Recomendación
-
-- D1 si Moderador continuará alojado en Sites y el objetivo es reducir operación.
-- Node/PostgreSQL si ITAM ya ofrecerá infraestructura administrada, respaldos y soporte para ese servidor.
-- En ambos casos conservar el CSV como respaldo y una cola local de eventos para operar durante fallas de internet.
-
-Referencias vigentes al 31 de agosto de 2026:
-
-- https://developers.cloudflare.com/d1/platform/pricing/
-- https://developers.cloudflare.com/workers/platform/pricing/
-- https://developers.cloudflare.com/d1/worker-api/d1-database/
-- https://www.postgresql.org/docs/current/admin.html
+D1 reduce operación porque Moderador ya corre como Worker. Si ITAM decide centralizar en un servicio Node administrado, se puede conservar el contrato HTTP y migrar únicamente la capa de almacenamiento. Node/PostgreSQL daría mayor integración institucional, pero requiere operar TLS, disponibilidad, respaldos, pool de conexiones, actualizaciones y monitoreo. El navegador nunca debe conectarse directamente a PostgreSQL.

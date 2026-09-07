@@ -6,13 +6,13 @@ import { ACCESS_COOKIE, accessToken } from "../worker/access-control.ts";
 const protectedEnv = { ACCESS_MODE: "protected", ACCESS_PIN: "test-password", ACCESS_SESSION_SECRET: "test-session-secret" };
 const protectedCookie = `${ACCESS_COOKIE}=${await accessToken(protectedEnv.ACCESS_SESSION_SECRET)}`;
 
-async function render(path = "/", { env = {}, headers = {} } = {}) {
+async function render(path = "/", { env = {}, headers = {}, method = "GET", body } = {}) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request(`http://localhost${path}`, { headers: { accept: "text/html", ...headers } }),
+    new Request(`http://localhost${path}`, { method, body, headers: { accept: "text/html", ...headers } }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) }, ...env },
     { waitUntil() {}, passThroughOnException() {} },
   );
@@ -94,4 +94,26 @@ test("requires the shared password before committee selection", async () => {
   assert.match(await accessPage.text(), /Acceso a Moderador/);
   assert.equal((await renderProtected()).status, 200);
   assert.equal((await render("/", { env: { ACCESS_MODE: "public" } })).status, 200);
+  const protectedAdminInPublicMode = await render("/admin/asistencia", { env: { ACCESS_MODE: "public", ACCESS_PIN: "test-password", ACCESS_SESSION_SECRET: "test-session-secret" } });
+  assert.equal(protectedAdminInPublicMode.status, 302);
+});
+
+test("renders the protected centralized attendance panel", async () => {
+  const response = await renderProtected("/admin/asistencia");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Asistencia centralizada/);
+  assert.match(html, /Sólo lectura/);
+  assert.match(html, /Exportar bitácora CSV/);
+});
+
+test("keeps attendance writes protected when the rest of the site is public", async () => {
+  const response = await render("/api/attendance/sessions/example/close", {
+    env: { ACCESS_MODE: "public", ACCESS_PIN: "test-password", ACCESS_SESSION_SECRET: "test-session-secret" },
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { ok: false, error: "unauthorized" });
 });

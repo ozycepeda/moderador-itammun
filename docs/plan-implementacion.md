@@ -1,10 +1,12 @@
-# Plan de implementación — segunda iteración
+# Plan de implementación — historial de iteraciones
 
 **Estado:** implementación completada; lint, build y pruebas automatizadas aprobadas
 
 **Fecha:** 15 de agosto de 2026
 
 **Objetivo:** adaptar la consola al orden real de una sesión y reducir pasos para la Mesa.
+
+> Las secciones 1–8 documentan decisiones históricas de la segunda iteración. Las iteraciones posteriores al final del documento sustituyen las decisiones incompatibles, en particular acceso, selección de participantes y persistencia.
 
 ## 1. Decisiones confirmadas
 
@@ -366,3 +368,15 @@ Decisiones confirmadas para esta versión:
 - **Finalizar sesión** confirma, exporta asistencia, limpia el estado local y vuelve al selector.
 - Catálogo, tópicos, nombres, opciones y bitácora nueva responden al selector global ES/EN.
 - El esquema local sube a versión 5 y migra sesiones anteriores sin perder información.
+
+## Iteración 6 — bitácora central D1
+
+- **Finalizar sesión** guarda primero un snapshot inmutable en D1 y sólo después elimina el estado local.
+- El UUID de sesión hace el POST idempotente; el mismo contenido devuelve el recibo existente y un contenido diferente no reemplaza el cierre.
+- Todos los participantes seleccionados en setup reciben una fila, incluidos `Sin registrar`, `Ausente` y `Observador`.
+- ICJ guarda por separado el nombre del juez y el país representado, en español e inglés.
+- Cada cierre conserva llamadas acumuladas, warnings activos y faltas; cada cuarta llamada produce una falta.
+- El CSV por sesión sigue descargándose localmente tanto en éxito como ante un error de red o D1.
+- `/admin/asistencia` ofrece una vista bilingüe de sólo lectura, filtros, detalle por sesión y CSV consolidado.
+- La misma contraseña protege escrituras y administración aun cuando `ACCESS_MODE=public` libere el resto del sitio.
+- Los registros expiran seis meses después de recibirse y se depuran durante operaciones de la bitácora.
