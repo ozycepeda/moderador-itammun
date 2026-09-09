@@ -40,7 +40,21 @@ export async function requestHasAccess(request: Request, sessionSecret: string) 
 
 export function safeNextPath(value: unknown) {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/acceso")) return "/";
-  return value;
+  // El router RSC de vinext pide la variante de datos "<ruta>.rsc?_rsc". Si el
+  // gate captura esa URL como "next", el login termina navegando al payload RSC
+  // crudo. Normalizamos a la ruta de pagina real antes de guardarla.
+  let path = value;
+  let query = "";
+  const q = path.indexOf("?");
+  if (q !== -1) {
+    query = path.slice(q + 1);
+    path = path.slice(0, q);
+  }
+  if (path.endsWith(".rsc")) path = path.slice(0, -4) || "/";
+  const params = new URLSearchParams(query);
+  params.delete("_rsc");
+  const rest = params.toString();
+  return rest ? `${path}?${rest}` : path;
 }
 
 export function accessCookie(token: string, secure: boolean) {
