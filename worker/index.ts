@@ -51,10 +51,13 @@ const worker = {
     };
 
     const isLogin = url.pathname === "/api/access/login";
+    // El ledger de asistencia (lectura) va siempre tras el PIN. La ESCRITURA
+    // (/api/attendance/.../close) la dispara la consola del moderador, que puede
+    // ser publica; se queda fuera del PIN y protegida por sameOrigin en su
+    // handler, para que "Finalizar sesion" guarde aun sin login de admin.
     const alwaysProtected = url.pathname === "/admin"
       || url.pathname.startsWith("/admin/")
-      || url.pathname.startsWith("/api/admin/")
-      || url.pathname.startsWith("/api/attendance/");
+      || url.pathname.startsWith("/api/admin/");
 
     if (isLogin && request.method === "POST") {
       if (!runtimeEnv.ACCESS_PIN || !runtimeEnv.ACCESS_SESSION_SECRET) {

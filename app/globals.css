@@ -86,6 +86,15 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .sync-local { background: #3e3b2a; color: #e8c874; }
 .sync-connecting { background: #223c34; color: #aed1c2; }
 .secondary-button, .primary-button, .primary-controls button, .topic-strip button, .full-button { min-height: 40px; padding: 0 .9rem; border: 1px solid currentColor; background: transparent; color: inherit; font-size: .74rem; font-weight: 750; }
+/* Centrado vertical/horizontal consistente del texto en botones y pastillas.
+   Se excluyen los que usan space-between (.rule-button, .blank-card button). */
+.secondary-button, .primary-button, .primary-controls button, .topic-strip button, .full-button,
+.console-tabs button, .console-subtabs button, .language-switcher button,
+.yield-panel button, .yield-status button, .vote-actions button,
+.appeal-list article button, .projector-link, .vote-result > button,
+.open-access, .sync-state, .zero-time-badge {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem; text-align: center; line-height: 1.1; white-space: nowrap;
+}
 .console-header .secondary-button { border-color: #ffffff55; color: white; }
 .console-header .finish-session-button { border-color: #e6aaa4; color: #ffd8d4; }
 .console-header .finish-session-button:disabled { cursor: wait; opacity: .55; }
@@ -223,8 +232,11 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .projector-action { color: #ffffff9c; font-size: .8rem; letter-spacing: .15em; text-transform: uppercase; }
 .projector-choice { margin-top: 1rem; color: color-mix(in srgb, var(--committee-color), white 30%); font-size: clamp(1rem, 2vw, 1.4rem); }
 .projector-warning { margin-top: 1rem; padding: .5rem .75rem; border: 1px solid #eaa49e; border-radius: 999px; color: #ffd0cc; font-size: .75rem; font-weight: 800; }
-.projector-vote h1, .projector-result h1, .projector-idle h1 { margin: .5rem 0 0; font-size: clamp(3rem, 8vw, 8rem); font-weight: 500; line-height: .95; }
+.projector-vote h1, .projector-result h1, .projector-idle h1 { margin: .5rem 0 0; font-size: clamp(3rem, 8vw, 8rem); font-weight: 500; line-height: .95; overflow-wrap: break-word; }
 .projector-result h1 { max-width: 1000px; font-size: clamp(2.2rem, 5vw, 5rem); }
+/* El titulo ocioso es el TOPICO (texto largo): que escale y quepa sin cortarse. */
+.projector-idle h1 { max-width: min(1150px, 92vw); font-size: clamp(1.9rem, 4.6vw, 4.8rem); line-height: 1.05; hyphens: auto; }
+.projector-content { overflow-y: auto; }
 .projector-counts { display: grid; grid-template-columns: repeat(3, minmax(150px, 240px)); margin-top: 3rem; border: 1px solid #ffffff40; }
 .projector-counts div { display: grid; gap: .4rem; padding: 1.7rem; border-right: 1px solid #ffffff40; }
 .projector-counts div:last-child { border: 0; }
