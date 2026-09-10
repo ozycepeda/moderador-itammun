@@ -438,7 +438,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
       <section className="session-identity-strip">
         <span className="section-kicker">{t("sessionTitle")}</span>
         <strong>{state.session.title || t("sessionTitle")}</strong>
-        {state.session.startedAt && <time dateTime={state.session.startedAt}>{new Intl.DateTimeFormat(language === "es" ? "es-MX" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(state.session.startedAt))}</time>}
+        {state.session.startedAt && <time dateTime={state.session.startedAt}>{new Intl.DateTimeFormat(language === "es" ? "es-MX" : "en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Mexico_City" }).format(new Date(state.session.startedAt))}</time>}
         {closeStatus === "error" && <p className="attendance-save-error" role="alert">{t(closeError === "conflict" ? "attendanceConflict" : "attendanceSaveError")}</p>}
       </section>
 

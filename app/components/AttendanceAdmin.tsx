@@ -66,7 +66,9 @@ export function AttendanceAdmin({ committees }: { committees: Committee[] }) {
   exportQuery.set("lang", language);
 
   function formatDate(value: string) {
-    return new Intl.DateTimeFormat(language === "es" ? "es-MX" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+    // Los timestamps se guardan en UTC (ISO "...Z"). Fijamos la zona a CDMX
+    // para que el ledger no muestre la hora del entorno de render (Workers = UTC).
+    return new Intl.DateTimeFormat(language === "es" ? "es-MX" : "en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Mexico_City" }).format(new Date(value));
   }
 
   function committeeName(session: AttendanceSessionSummary) {
