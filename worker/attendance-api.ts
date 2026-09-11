@@ -1,6 +1,7 @@
 import { buildAdminAttendanceCsv } from "./attendance-export";
 import {
   exportAttendanceRows,
+  getLatestCommitteeTopic,
   getAttendanceSession,
   listAttendanceSessions,
   saveAttendanceSession,
@@ -40,6 +41,21 @@ function decodePathSegment(value: string) {
 export async function handleAttendanceApi(request: Request, db: AttendanceDatabase | undefined): Promise<Response | null> {
   const url = new URL(request.url);
   const closeMatch = url.pathname.match(/^\/api\/attendance\/sessions\/([^/]+)\/close$/);
+  const topicMatch = url.pathname.match(/^\/api\/attendance\/committees\/([^/]+)\/latest-topic$/);
+
+  if (topicMatch) {
+    if (request.method !== "GET") return json({ ok: false, error: "method-not-allowed" }, 405);
+    if (!db) return json({ ok: false, error: "database-unavailable" }, 503);
+    const committeeSlug = decodePathSegment(topicMatch[1]);
+    if (!committeeSlug) return json({ ok: false, error: "invalid-request" }, 400);
+    try {
+      const topic = await getLatestCommitteeTopic(db, committeeSlug);
+      return topic ? json({ ok: true, topic }) : json({ ok: false, error: "not-found" }, 404);
+    } catch (error) {
+      console.error("Latest committee topic failed", error);
+      return json({ ok: false, error: "internal-error" }, 500);
+    }
+  }
 
   if (closeMatch) {
     if (request.method !== "POST") return json({ ok: false, error: "method-not-allowed" }, 405);

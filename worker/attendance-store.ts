@@ -256,6 +256,23 @@ export async function listAttendanceSessions(db: AttendanceDatabase, filters: At
   return (result.results ?? []).map(summary);
 }
 
+export type LatestCommitteeTopic = {
+  es: string;
+  en: string;
+};
+
+export async function getLatestCommitteeTopic(db: AttendanceDatabase, committeeSlug: string): Promise<LatestCommitteeTopic | null> {
+  await purgeExpiredAttendance(db);
+  const row = await db.prepare(`
+    SELECT topic_es AS es, topic_en AS en
+    FROM attendance_sessions
+    WHERE committee_slug = ? AND (TRIM(topic_es) <> '' OR TRIM(topic_en) <> '')
+    ORDER BY closed_at DESC
+    LIMIT 1
+  `).bind(committeeSlug).first<LatestCommitteeTopic>();
+  return row ? { es: row.es || row.en, en: row.en || row.es } : null;
+}
+
 type EntryRow = Omit<AttendanceStoredEntry, "observer" | "warningsTotal" | "warningsActive" | "faults"> & {
   observer: number | boolean;
   warningsTotal: number | string;
