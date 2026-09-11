@@ -430,16 +430,16 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
 .setup-loading { display: grid; min-height: 100vh; place-items: center; color: var(--muted); }
 .attendance-gate-shell { padding-bottom: 4rem; }
 .attendance-gate-intro { padding-bottom: 1.5rem; }
-.attendance-gate-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); align-items: start; gap: 1.2rem; margin: 0 clamp(1rem, 4vw, 4rem); }
+.attendance-gate-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 1.2rem; margin: 0 clamp(1rem, 4vw, 4rem); }
 .attendance-gate-panel { border: 1px solid var(--line); }
 .participant-add-panel { margin: 0 0 1.5rem; padding: 1rem; border: 1px solid var(--line); background: var(--paper); }
 .participant-add-panel > label { margin-bottom: .7rem; }
 .catalog-participant-controls { display: grid; grid-template-columns: minmax(140px, .65fr) minmax(220px, 1fr) auto; gap: .5rem; }
 .catalog-participant-controls button { min-height: 44px; padding: 0 .9rem; border: 1px solid var(--committee-color); background: var(--committee-color); color: var(--committee-dark); font-weight: 800; }
 .attendance-custom-participant > div { grid-template-columns: repeat(2, minmax(120px, 1fr)) auto; }
-.attendance-start-card { position: sticky; top: 1rem; padding: 1.5rem; border: 1px solid var(--line); background: white; box-shadow: 0 16px 40px #10201912; }
-.attendance-start-card h2 { margin: .5rem 0 1rem; font-size: 1.8rem; font-weight: 550; }
-.attendance-start-card ul { display: grid; gap: .7rem; margin: 1rem 0 1.4rem; padding: 0; list-style: none; }
+.attendance-start-card { position: static; width: 100%; padding: clamp(1.25rem, 3vw, 2.5rem); border: 1px solid var(--line); background: white; box-shadow: 0 16px 40px #10201912; }
+.attendance-start-card h2 { margin: .5rem 0 1.25rem; font-size: clamp(1.8rem, 3vw, 2.6rem); font-weight: 550; }
+.attendance-start-card ul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .7rem; margin: 1rem 0 1.4rem; padding: 0; list-style: none; }
 .attendance-start-card li { position: relative; padding-left: 1.7rem; color: var(--muted); font-size: .78rem; line-height: 1.4; }
 .attendance-start-card li::before { position: absolute; left: 0; content: "○"; color: var(--muted); }
 .attendance-start-card li.complete { color: var(--success); font-weight: 750; }
@@ -560,6 +560,7 @@ a.committee-card:hover .committee-secretariat, a.committee-card:hover p { color:
   .admin-detail-heading { align-items: stretch; flex-direction: column; }
   .attendance-custom-participant > div, .custom-topic-form > div, .directed-donation { grid-template-columns: 1fr; }
   .topic-option-grid { grid-template-columns: 1fr; }
+  .attendance-start-card ul { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
