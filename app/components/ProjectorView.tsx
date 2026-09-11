@@ -8,6 +8,7 @@ import { useLocalCommitteeState } from "../hooks/useLocalCommitteeState";
 import { createInitialState, getDisciplinaryCounts } from "../lib/session-state";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useLanguage } from "./LanguageProvider";
+import { formatTime } from "./TimeInput";
 
 export function ProjectorView({ committee, sessionKey }: { committee: Committee; sessionKey: string }) {
   const { language, t } = useLanguage();
@@ -32,6 +33,14 @@ export function ProjectorView({ committee, sessionKey }: { committee: Committee;
   const secretariat = committee.slug.startsWith("lienzo-") ? t("blankCanvas") : committeeDisplaySecretariat(committee, language);
   const abbreviation = committee.slug.startsWith("lienzo-") ? (committee.abbreviation || t("unnamedCommittee")) : committeeDisplayAbbreviation(committee, language);
   const displayedTopic = state.topicByLanguage?.[language] ?? state.topic;
+  const currentSpeaker = state.participants.find((participant) => participant.id === state.currentSpeakerParticipantId);
+  const currentSpeakerName = currentSpeaker ? representationFullName(currentSpeaker, language) : state.currentSpeaker;
+  const interactionMode = state.currentSpeakerYield === "questions" || state.currentSpeakerYield === "comments";
+  const unlimitedDocument = state.unlimitedQuestionDocument === "custom"
+    ? state.unlimitedQuestionCustomLabel
+    : state.unlimitedQuestionDocument
+      ? t(state.unlimitedQuestionDocument === "working-a1" ? "workingPaperA1" : state.unlimitedQuestionDocument === "working-b1" ? "workingPaperB1" : state.unlimitedQuestionDocument === "possible-resolution-a1" ? "possibleResolutionA1" : "possibleResolutionB1")
+      : "";
   const cssVars = { "--committee-color": committee.color, "--committee-dark": committee.darkColor } as React.CSSProperties;
   const disciplinaryLabel = (totalWarnings: number) => {
     const discipline = getDisciplinaryCounts(totalWarnings);
@@ -87,6 +96,25 @@ export function ProjectorView({ committee, sessionKey }: { committee: Committee;
           <div className="projector-result">
             <span className="projector-kicker">{t("voteComplete")}</span><h1>{state.vote.label}</h1>
             <div className="projector-counts projector-counts-two"><div><strong>{appealCounts.for}</strong><span>{t("inFavor")}</span></div><div><strong>{appealCounts.against}</strong><span>{t("against")}</span></div></div>
+          </div>
+        ) : interactionMode && state.currentSpeaker ? (
+          <div className="projector-speaker-interaction">
+            <span className="projector-kicker">{displayedTopic}</span>
+            <p>{t(state.currentSpeakerYield === "comments" ? "commentsWithSpeaker" : "questionsWithSpeaker", { name: currentSpeakerName })}</p>
+            <h1>{formatTime(state.currentSpeakerRemainingTime)}</h1>
+            <strong>{currentSpeakerName}</strong>
+          </div>
+        ) : state.activeModule === "unlimited-questions" ? (
+          <div className="projector-unlimited-questions">
+            <span className="projector-kicker">{t("freeParticipation")} · {t("noTimerNoQueue")}</span>
+            <h1>{t("unlimitedQuestionsSession")}</h1>
+            <p>{unlimitedDocument || t("noDocumentSelected")}</p>
+          </div>
+        ) : state.activeModule === "speakers" && state.currentSpeaker ? (
+          <div className="projector-speaker-interaction">
+            <span className="projector-kicker">{t("currentSpeaker")} · {displayedTopic}</span>
+            <h1>{formatTime(state.currentSpeakerRemainingTime)}</h1>
+            <strong>{currentSpeakerName}</strong>
           </div>
         ) : (
           <div className="projector-idle"><span className="projector-kicker">{t("sessionInProgress")}</span><h1>{displayedTopic || t("waitingForDebate")}</h1>{state.currentSpeaker && <p>{t("atPodium")} <strong>{state.currentSpeakerParticipantId ? representationFullName(state.participants.find((participant) => participant.id === state.currentSpeakerParticipantId) ?? { id: "legacy", name: state.currentSpeaker, observer: false }, language) : state.currentSpeaker}</strong></p>}</div>

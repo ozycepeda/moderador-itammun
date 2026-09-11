@@ -16,7 +16,7 @@ test("builds a bilingual close payload with every attendance state and ICJ judge
     },
     { id: "judge-pending", name: "Pending Judge — France", observer: false, kind: "judge", countryCode: "FR" },
   ]);
-  state.session = { id: "session-cij", title: "Día 1", startedAt: "2026-09-01T14:00:00.000Z" };
+  state.session = { id: "session-cij", title: "Sesión 1 de trabajo", number: 1, startedAt: "2026-09-01T14:00:00.000Z" };
   state.topic = "Caso";
   state.topicByLanguage = { es: "Caso", en: "Case" };
   state.attendance["judge-mx"] = "present-voting";

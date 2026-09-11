@@ -13,7 +13,7 @@ export function CommitteePicker({ committees }: { committees: Committee[] }) {
   function openBlankCanvas() {
     const name = customName.trim() || t("unnamedCommittee");
     const key = `lienzo-${crypto.randomUUID()}`;
-    window.location.assign(`/comite/${key}/setup?nombre=${encodeURIComponent(name)}`);
+    window.location.assign(`/comite/${key}?nombre=${encodeURIComponent(name)}`);
   }
 
   return (
@@ -36,7 +36,7 @@ export function CommitteePicker({ committees }: { committees: Committee[] }) {
         {committees.map((committee, index) => (
           <a
             className="committee-card"
-            href={`/comite/${committee.slug}/setup`}
+            href={`/comite/${committee.slug}`}
             key={committee.id}
             style={{ "--committee-color": committee.color, "--committee-dark": committee.darkColor } as React.CSSProperties}
           >

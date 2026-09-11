@@ -1,7 +1,5 @@
-import { notFound } from "next/navigation";
-import { CommitteeSetup } from "../../../components/CommitteeSetup";
+import { notFound, redirect } from "next/navigation";
 import { committeeBySlug } from "../../../lib/committees";
-import { blankCommitteeDetail, getCommitteeDetail } from "../../../lib/itammun-api";
 
 export default async function SetupPage({ params, searchParams }: {
   params: Promise<{ slug: string }>;
@@ -13,11 +11,6 @@ export default async function SetupPage({ params, searchParams }: {
   const isBlank = slug.startsWith("lienzo-");
   if (!committee && !isBlank) notFound();
 
-  const resolved = committee ?? {
-    id: slug, slug, abbreviation: query.nombre || "", name: query.nombre || "",
-    language: "ES" as const, level: "Intermedio" as const, representationType: "delegacion" as const,
-    representationsCount: 0, secretariat: "", color: "#C2943D", darkColor: "#2E2812",
-  };
-  const detail = committee ? await getCommitteeDetail(committee) : blankCommitteeDetail();
-  return <CommitteeSetup committee={resolved} detail={detail} sessionKey={slug} />;
+  const suffix = query.nombre ? `?nombre=${encodeURIComponent(query.nombre)}` : "";
+  redirect(`/comite/${slug}${suffix}`);
 }

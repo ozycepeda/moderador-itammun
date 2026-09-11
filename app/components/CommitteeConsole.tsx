@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { committeeDisplayAbbreviation, committeeDisplayName, committeeDisplaySecretariat, type Committee } from "../lib/committees";
 import { features } from "../lib/features";
-import { representationFullName, representationPrimaryName, representationSecondaryName, topicDisplayTitle, type CommitteeDetail, type CommitteeTopic } from "../lib/itammun-api";
+import { representationFullName, representationMatches, representationPrimaryName, representationSecondaryName, topicDisplayTitle, type CommitteeDetail, type CommitteeTopic, type Representation } from "../lib/itammun-api";
 import { useLocalCommitteeState } from "../hooks/useLocalCommitteeState";
 import { attendanceCsvFilename, buildAttendanceCsv } from "../lib/attendance-csv";
 import { buildAttendanceClosePayload } from "../lib/attendance-submission";
@@ -20,12 +20,15 @@ import {
   createInitialState,
   getDisciplinaryCounts,
   isParticipantInDebate,
+  sessionTitle,
   startFinalVote,
   type AttendanceStatus,
   type CaucusMode,
   type ConsoleTab,
   type FinalVoteRoundTwoChoice,
   type SessionState,
+  type SessionNumber,
+  type UnlimitedQuestionDocument,
   type VoteChoice,
 } from "../lib/session-state";
 import { formatTime, TimeInput } from "./TimeInput";
@@ -33,8 +36,10 @@ import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useLanguage } from "./LanguageProvider";
 import { SpeakerQueue } from "./SpeakerQueue";
 
-const tabIds: ConsoleTab[] = ["rollcall", "speakers", "caucus", ...(features.motionsAndAppeals ? ["motions" as const] : []), "voting", "log"];
+const tabIds: ConsoleTab[] = ["warnings", "speakers", "caucus", "unlimited-questions", ...(features.motionsAndAppeals ? ["motions" as const] : []), "voting", "log"];
 const attendanceValues: Array<Exclude<AttendanceStatus, "pending">> = ["present", "present-voting", "absent", "observer"];
+const sessionNumbers: SessionNumber[] = [1, 2, 3, 4, 5, 6, 7];
+const unlimitedDocuments: Exclude<UnlimitedQuestionDocument, "" | "custom">[] = ["working-a1", "working-b1", "possible-resolution-a1", "possible-resolution-b1"];
 
 export function CommitteeConsole({ committee, detail, sessionKey }: {
   committee: Committee;
@@ -46,16 +51,21 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
     sessionKey,
     createInitialState(selectedParticipants(detail.representations, detail.initiallyAssignedRepresentationIds)),
   );
-  const [activeTab, setActiveTab] = useState<ConsoleTab>("rollcall");
-  const [rollCallView, setRollCallView] = useState<"attendance" | "warnings">("attendance");
+  const activeTab = state.activeModule;
   const [speakerView, setSpeakerView] = useState<"list" | "questions">("list");
   const [speakerParticipantId, setSpeakerParticipantId] = useState("");
   const [questionParticipantId, setQuestionParticipantId] = useState("");
+  const [donationParticipantId, setDonationParticipantId] = useState("");
+  const [catalogParticipantId, setCatalogParticipantId] = useState("");
+  const [participantSearch, setParticipantSearch] = useState("");
+  const [customParticipantName, setCustomParticipantName] = useState("");
+  const [customParticipantCountry, setCustomParticipantCountry] = useState("");
   const [topicDraft, setTopicDraft] = useState("");
   const [customTopicMode, setCustomTopicMode] = useState(false);
+  const [topicLoadStatus, setTopicLoadStatus] = useState<"idle" | "loading" | "missing" | "error">("idle");
   const [copied, setCopied] = useState(false);
-  const [remaining, setRemaining] = useState(state.currentSpeakerAllottedTime);
-  const [running, setRunning] = useState(false);
+  const remaining = state.currentSpeakerRemainingTime;
+  const running = state.currentSpeakerRunning;
   const [caucusMode, setCaucusMode] = useState<CaucusMode>("moderated");
   const [caucusRemaining, setCaucusRemaining] = useState(state.caucuses.moderated.duration);
   const [caucusRunning, setCaucusRunning] = useState(false);
@@ -66,8 +76,8 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
   const closeTimestampRef = useRef<string | null>(null);
 
   const tabLabels: Record<ConsoleTab, string> = {
-    rollcall: t("rollCall"), speakers: t("speakers"), caucus: t("caucusAndExtensions"),
-    motions: t("motions"), voting: t("nominalVoting"), log: t("log"),
+    warnings: t("warningsView"), speakers: t("speakers"), caucus: t("caucusAndExtensions"),
+    "unlimited-questions": t("unlimitedQuestionsSession"), motions: t("motions"), voting: t("nominalVoting"), log: t("log"),
   };
   const attendanceLabels: Record<Exclude<AttendanceStatus, "pending">, string> = {
     present: t("present"), "present-voting": t("presentAndVoting"), absent: t("absent"), observer: t("observer"),
@@ -75,12 +85,13 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
 
   useEffect(() => {
     if (!running || remaining <= 0) return;
-    const timer = window.setInterval(() => setRemaining((value) => {
-      if (value <= 1) setRunning(false);
-      return Math.max(0, value - 1);
-    }), 1000);
+    const timer = window.setInterval(() => update((current) => ({
+      ...current,
+      currentSpeakerRemainingTime: Math.max(0, current.currentSpeakerRemainingTime - 1),
+      currentSpeakerRunning: current.currentSpeakerRemainingTime > 1,
+    })), 1000);
     return () => window.clearInterval(timer);
-  }, [running, remaining]);
+  }, [running, remaining, update]);
 
   useEffect(() => {
     if (!caucusRunning || caucusRemaining <= 0) return;
@@ -103,6 +114,16 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
     return { inRoom, voting, quorum: membersPresent > 0 && membersPresent >= Math.floor(memberCount / 2) + 1 };
   }, [state.assignedParticipantIds, state.attendance, state.participants]);
 
+  const attendanceComplete = state.participants.length > 0
+    && state.participants.every((participant) => state.attendance[participant.id] && state.attendance[participant.id] !== "pending");
+  const sessionReady = state.session.number > 0 && attendanceComplete && attendance.quorum;
+  const sessionDisplayTitle = state.session.number ? sessionTitle(state.session.number, language) : "";
+  const participantIds = useMemo(() => new Set(state.participants.map((participant) => participant.id)), [state.participants]);
+  const availableCatalogParticipants = useMemo(
+    () => detail.representations.filter((participant) => !participantIds.has(participant.id) && representationMatches(participant, participantSearch, language)),
+    [detail.representations, language, participantIds, participantSearch],
+  );
+
   const orderedParticipants = useMemo(() => {
     const assigned = new Set(state.assignedParticipantIds);
     return [...state.participants].sort((left, right) => {
@@ -120,10 +141,6 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
     () => state.participants.filter((participant) => state.attendance[participant.id] === "present-voting"),
     [state.attendance, state.participants],
   );
-  const topicLocked = state.speakers.length > 0;
-  const legacyKnownTopic = detail.topics.find((topic) => topic.title === state.topic);
-  const knownTopic = detail.topics.find((topic) => topic.id === state.topicId) ?? legacyKnownTopic;
-  const topicSelectValue = customTopicMode || (state.topic && !knownTopic) ? "__custom" : knownTopic?.id ?? "";
   const currentAppealVoterId = state.vote.status === "active" ? state.vote.queue[state.vote.currentIndex] : undefined;
   const currentAppealVoter = state.participants.find((participant) => participant.id === currentAppealVoterId);
   const appealVoteCounts = Object.values(state.vote.ballots).reduce((counts, choice) => ({ ...counts, [choice]: counts[choice] + 1 }), { for: 0, against: 0 });
@@ -141,6 +158,20 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
   const currentSpeakerName = currentSpeakerParticipant ? representationFullName(currentSpeakerParticipant, language) : state.currentSpeaker;
   const currentQuestionerParticipant = state.participants.find((participant) => participant.id === state.currentQuestionerParticipantId);
   const currentQuestionerName = currentQuestionerParticipant ? representationFullName(currentQuestionerParticipant, language) : state.currentQuestioner;
+  const donationRecipients = participantsInDebate.filter((participant) => participant.id !== state.currentSpeakerParticipantId);
+  const interactionMode = state.currentSpeakerYield === "questions" || state.currentSpeakerYield === "comments";
+
+  function setActiveTab(tab: ConsoleTab) {
+    update((current) => ({ ...current, activeModule: tab }));
+  }
+
+  function setSpeakerTimer(values: { remaining?: number; running?: boolean }) {
+    update((current) => ({
+      ...current,
+      currentSpeakerRemainingTime: values.remaining ?? current.currentSpeakerRemainingTime,
+      currentSpeakerRunning: values.running ?? current.currentSpeakerRunning,
+    }));
+  }
 
   function participantName(participantId: string | undefined, fallback = "") {
     const participant = state.participants.find((item) => item.id === participantId);
@@ -177,16 +208,103 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
     return t("disciplinaryBadge", { warnings: discipline.activeWarnings, faults: discipline.faults });
   }
 
-  function updateTopic(topic: CommitteeTopic | string) {
-    const value = typeof topic === "string" ? topic : topic.title;
-    const translatedValue = typeof topic === "string" ? topic : topicDisplayTitle(topic, language);
+  function selectSessionNumber(number: SessionNumber) {
     update((current) => ({
       ...current,
+      session: { ...current.session, number, title: sessionTitle(number, "es") },
+    }));
+    setTopicLoadStatus("idle");
+  }
+
+  function addParticipant(participant: Representation) {
+    update((current) => {
+      if (current.participants.some((item) => item.id === participant.id)) return current;
+      return {
+        ...current,
+        participants: [...current.participants, participant],
+        assignedParticipantIds: [...current.assignedParticipantIds, participant.id],
+        attendance: { ...current.attendance, [participant.id]: participant.observer ? "observer" : "pending" },
+      };
+    });
+    setCatalogParticipantId("");
+  }
+
+  function addCatalogParticipant() {
+    const participant = detail.representations.find((item) => item.id === catalogParticipantId);
+    if (participant) addParticipant(participant);
+  }
+
+  function addCustomParticipant() {
+    const name = customParticipantName.trim();
+    const country = customParticipantCountry.trim();
+    if (!name || (committee.representationType === "juez" && !country)) return;
+    const isJudge = committee.representationType === "juez";
+    addParticipant({
+      id: `custom-${crypto.randomUUID()}`,
+      name: isJudge ? `${name} — ${country}` : name,
+      nameByLanguage: { es: name, en: name },
+      secondaryNameByLanguage: isJudge ? { es: country, en: country } : undefined,
+      observer: false,
+      kind: isJudge ? "judge" : "custom",
+      status: "occupied",
+      searchTerms: [name, country].filter(Boolean),
+    });
+    setCustomParticipantName("");
+    setCustomParticipantCountry("");
+  }
+
+  function topicCacheKey() {
+    return `itammun:committee-topic:${sessionKey}`;
+  }
+
+  async function startSessionAfterAttendance() {
+    if (!sessionReady || state.session.number === 0) return;
+    if (state.session.number === 1) {
+      update((current) => ({ ...current, phase: "topic-selection", session: { ...current.session, startedAt: new Date().toISOString() } }));
+      return;
+    }
+    setTopicLoadStatus("loading");
+    try {
+      const response = await fetch(`/api/attendance/committees/${encodeURIComponent(sessionKey)}/latest-topic`, { headers: { accept: "application/json" } });
+      const result = await response.json() as { ok?: boolean; topic?: { es?: string; en?: string } };
+      if (response.ok && result.ok && result.topic && (result.topic.es || result.topic.en)) {
+        const topicByLanguage = { es: result.topic.es || result.topic.en || "", en: result.topic.en || result.topic.es || "" };
+        window.localStorage.setItem(topicCacheKey(), JSON.stringify(topicByLanguage));
+        update((current) => ({ ...current, topic: topicByLanguage.es, topicByLanguage, topicId: "", phase: "debate", session: { ...current.session, startedAt: new Date().toISOString() } }));
+        setTopicLoadStatus("idle");
+        return;
+      }
+      const cached = window.localStorage.getItem(topicCacheKey());
+      if (cached) {
+        const topicByLanguage = JSON.parse(cached) as { es?: string; en?: string };
+        if (topicByLanguage.es || topicByLanguage.en) {
+          const normalized = { es: topicByLanguage.es || topicByLanguage.en || "", en: topicByLanguage.en || topicByLanguage.es || "" };
+          update((current) => ({ ...current, topic: normalized.es, topicByLanguage: normalized, topicId: "", phase: "debate", session: { ...current.session, startedAt: new Date().toISOString() } }));
+          setTopicLoadStatus("idle");
+          return;
+        }
+      }
+      setTopicLoadStatus(response.status === 404 ? "missing" : "error");
+    } catch {
+      setTopicLoadStatus("error");
+    }
+  }
+
+  function chooseTopic(topic: CommitteeTopic | string) {
+    const value = typeof topic === "string" ? topic.trim() : topic.title;
+    if (!value) return;
+    const topicByLanguage = typeof topic === "string" ? { es: value, en: value } : topic.titleByLanguage;
+    window.localStorage.setItem(topicCacheKey(), JSON.stringify(topicByLanguage));
+    update((current) => ({
+      ...current,
+      phase: "debate",
       topic: value,
       topicId: typeof topic === "string" ? "" : topic.id,
-      topicByLanguage: typeof topic === "string" ? undefined : topic.titleByLanguage,
-      events: value && value !== current.topic ? [{ key: "eventTopicDefined", values: { topic: translatedValue, topicId: typeof topic === "string" ? "" : topic.id } }, ...current.events] : current.events,
+      topicByLanguage,
+      events: [{ key: "eventTopicDefined", values: { topic: typeof topic === "string" ? value : topicDisplayTitle(topic, language), topicId: typeof topic === "string" ? "" : topic.id } }, ...current.events],
     }));
+    setTopicDraft("");
+    setCustomTopicMode(false);
   }
 
   function addSpeaker() {
@@ -202,8 +320,8 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
 
   function beginNextSpeaker() {
     const next = state.speakers[0];
-    if (!next) return;
-    const donatedSeconds = state.currentSpeakerYield === "next" ? state.pendingDonationSeconds : 0;
+    if (!next || (state.currentSpeaker && remaining > 0)) return;
+    const donatedSeconds = next.participantId ? state.donatedSecondsByParticipantId[next.participantId] ?? 0 : 0;
     const allotted = state.speakerTime + (next.bonusSeconds ?? 0) + donatedSeconds;
     update((current) => ({
       ...advanceToNextSpeaker(current),
@@ -212,30 +330,25 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
         ...current.events,
       ],
     }));
-    setRemaining(allotted);
-    setRunning(false);
   }
 
   function yieldToChair() {
-    if (!state.currentSpeaker || remaining <= 0) return;
+    if (!state.currentSpeaker || (remaining <= 0 && !interactionMode)) return;
     update((current) => ({
       ...applySpeakerYield(current, "chair", remaining),
       events: [{ key: "eventSpeakerYieldedChair", values: { name: currentSpeakerName, participantId: current.currentSpeakerParticipantId, time: formatTime(remaining) } }, ...current.events],
     }));
-    setRemaining(0);
-    setRunning(false);
   }
 
-  function yieldToNextSpeaker() {
-    const next = state.speakers[0];
-    if (!state.currentSpeaker || !next || remaining <= 0 || state.currentSpeakerReceivedDonation) return;
-    const recipient = participantName(next.participantId, next.name);
+  function yieldToDelegation() {
+    const recipientParticipant = donationRecipients.find((participant) => participant.id === donationParticipantId);
+    if (!state.currentSpeaker || !recipientParticipant || remaining <= 0 || state.currentSpeakerReceivedDonation) return;
+    const recipient = representationFullName(recipientParticipant, language);
     update((current) => ({
-      ...applySpeakerYield(current, "next", remaining),
-      events: [{ key: "eventSpeakerYieldedNext", values: { name: currentSpeakerName, participantId: current.currentSpeakerParticipantId, time: formatTime(remaining), recipient, recipientId: next.participantId ?? "" } }, ...current.events],
+      ...applySpeakerYield(current, "donation", remaining, recipientParticipant.id),
+      events: [{ key: "eventSpeakerYieldedNext", values: { name: currentSpeakerName, participantId: current.currentSpeakerParticipantId, time: formatTime(remaining), recipient, recipientId: recipientParticipant.id } }, ...current.events],
     }));
-    setRemaining(0);
-    setRunning(false);
+    setDonationParticipantId("");
   }
 
   function yieldToQuestions() {
@@ -244,7 +357,14 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
       ...applySpeakerYield(current, "questions", remaining),
       events: [{ key: "eventSpeakerYieldedQuestions", values: { name: currentSpeakerName, participantId: current.currentSpeakerParticipantId, time: formatTime(remaining) } }, ...current.events],
     }));
-    setRunning(false);
+  }
+
+  function yieldToComments() {
+    if (!state.currentSpeaker || remaining <= 0) return;
+    update((current) => ({
+      ...applySpeakerYield(current, "comments", remaining),
+      events: [{ key: "eventSpeakerYieldedComments", values: { name: currentSpeakerName, participantId: current.currentSpeakerParticipantId, time: formatTime(remaining) } }, ...current.events],
+    }));
   }
 
   function addQuestioner() {
@@ -342,7 +462,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
   }
 
   async function share() {
-    const setupUrl = new URL(`/comite/${sessionKey}/setup`, window.location.origin);
+    const setupUrl = new URL(`/comite/${sessionKey}`, window.location.origin);
     setupUrl.searchParams.set("nombre", committeeName);
     await navigator.clipboard.writeText(setupUrl.toString());
     setCopied(true);
@@ -421,6 +541,107 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
 
   const cssVars = { "--committee-color": committee.color, "--committee-dark": committee.darkColor } as React.CSSProperties;
 
+  if (state.phase === "attendance") {
+    return (
+      <main className="setup-shell attendance-gate-shell" style={cssVars}>
+        <header className="console-header">
+          <Link href="/" className="console-brand"><span className="brand-mark">I</span><span>ITAMMUN</span></Link>
+          <div className="committee-heading"><span>{secretariat}</span><h1>{abbreviation}</h1></div>
+          <div className="header-actions"><span className="setup-step">{t("attendanceBeforeDebate")}</span><LanguageSwitcher dark /></div>
+        </header>
+
+        <section className="setup-intro attendance-gate-intro">
+          <p className="eyebrow">{t("prepareSession")}</p>
+          <h2>{t("registerAttendanceFirst")}</h2>
+          <p>{t("attendanceLocksAfterStart")}</p>
+        </section>
+
+        <div className="attendance-gate-grid">
+          <section className="setup-panel attendance-gate-panel">
+            <div className="session-title-field">
+              <label htmlFor="session-number">{t("sessionTitle")}</label>
+              <select id="session-number" value={state.session.number || ""} onChange={(event) => selectSessionNumber(Number(event.target.value) as SessionNumber)}>
+                <option value="">{t("selectWorkingSession")}</option>
+                {sessionNumbers.map((number) => <option key={number} value={number}>{sessionTitle(number, language)}</option>)}
+              </select>
+              <p>{t("sessionTitleConstrainedHelp")}</p>
+            </div>
+
+            {detail.source === "live" && <div className="catalog-status catalog-status-live"><strong>{t("liveCatalogLoaded")}</strong><span>{t("occupiedSeatsIncluded")}</span></div>}
+            {detail.source === "unavailable" && <div className="catalog-status catalog-status-error" role="alert"><strong>{t("catalogUnavailable")}</strong><span>{t("catalogUnavailableHelp")}</span><button type="button" onClick={() => window.location.reload()}>{t("retry")}</button></div>}
+
+            <div className="setup-panel-heading"><div><span className="section-kicker">{t("rollCall")}</span><h2>{t("countriesAndPeople")}</h2></div><strong>{state.participants.length}</strong></div>
+
+            {availableCatalogParticipants.length > 0 || participantSearch ? <div className="participant-add-panel">
+              <label htmlFor="catalog-search">{t("addFromCatalog")}</label>
+              <div className="catalog-participant-controls">
+                <input id="catalog-search" value={participantSearch} onChange={(event) => setParticipantSearch(event.target.value)} placeholder={t("searchCatalog")} />
+                <select value={catalogParticipantId} onChange={(event) => setCatalogParticipantId(event.target.value)} aria-label={t("addFromCatalog")}>
+                  <option value="">{t("selectAvailableParticipant")}</option>
+                  {availableCatalogParticipants.map((participant) => <option key={participant.id} value={participant.id}>{representationFullName(participant, language)}</option>)}
+                </select>
+                <button type="button" disabled={!catalogParticipantId} onClick={addCatalogParticipant}>{t("add")}</button>
+              </div>
+            </div> : null}
+
+            <form className="custom-participant-form attendance-custom-participant" onSubmit={(event) => { event.preventDefault(); addCustomParticipant(); }}>
+              <label htmlFor="custom-participant">{t(committee.representationType === "juez" ? "addJudge" : "addParticipant")}</label>
+              <div>
+                <input id="custom-participant" value={customParticipantName} onChange={(event) => setCustomParticipantName(event.target.value)} placeholder={t(committee.representationType === "juez" ? "judgeName" : "freeName")} />
+                {committee.representationType === "juez" && <input value={customParticipantCountry} onChange={(event) => setCustomParticipantCountry(event.target.value)} placeholder={t("representedCountry")} />}
+                <button disabled={!customParticipantName.trim() || (committee.representationType === "juez" && !customParticipantCountry.trim())}>{t("add")}</button>
+              </div>
+            </form>
+
+            <div className="attendance-summary"><span>{t("inRoom")} <strong>{attendance.inRoom}</strong></span><span>{t("presentAndVoting")} <strong>{attendance.voting}</strong></span><span>{t("attendanceCompleted")} <strong>{state.participants.filter((participant) => state.attendance[participant.id] !== "pending").length}/{state.participants.length}</strong></span><span>{t(attendance.quorum ? "hasQuorum" : "noQuorum")}</span></div>
+            <div className="attendance-list">{orderedParticipants.map((representation) => {
+              const value = state.attendance[representation.id] || "pending";
+              return <article className="attendance-row" key={representation.id}>
+                <div className="attendance-person">{representation.flagUrl && <Image src={representation.flagUrl} alt="" width={32} height={22} unoptimized />}<span>{representationPrimaryName(representation, language)}{representationSecondaryName(representation, language) && <small>{representationSecondaryName(representation, language)}</small>}</span></div>
+                <div className="attendance-buttons" role="group" aria-label={t("attendanceFor", { name: representationFullName(representation, language) })}>{attendanceValues.map((option) => <button key={option} type="button" aria-pressed={value === option} className={`attendance-button status-${option}`} onClick={() => update((current) => ({ ...current, attendance: { ...current.attendance, [representation.id]: option } }))}>{attendanceLabels[option]}</button>)}<button type="button" className="attendance-clear" disabled={value === "pending"} onClick={() => update((current) => ({ ...current, attendance: { ...current.attendance, [representation.id]: "pending" } }))}>{t("clear")}</button></div>
+              </article>;
+            })}</div>
+          </section>
+
+          <aside className="attendance-start-card">
+            <span className="section-kicker">{t("startRequirements")}</span>
+            <h2>{sessionDisplayTitle || t("sessionTitle")}</h2>
+            <ul>
+              <li className={state.session.number ? "complete" : ""}>{t("requireSessionTitle")}</li>
+              <li className={attendanceComplete ? "complete" : ""}>{t("requireAllAttendance")}</li>
+              <li className={attendance.quorum ? "complete" : ""}>{t("requireQuorum")}</li>
+            </ul>
+            {(topicLoadStatus === "missing" || topicLoadStatus === "error") && <p className="attendance-save-error" role="alert">{t(topicLoadStatus === "missing" ? "previousTopicMissing" : "previousTopicError")}</p>}
+            <button className="primary-button" disabled={!sessionReady || topicLoadStatus === "loading"} onClick={startSessionAfterAttendance}>{t(topicLoadStatus === "loading" ? "recoveringTopic" : "startSession")}</button>
+          </aside>
+        </div>
+      </main>
+    );
+  }
+
+  if (state.phase === "topic-selection") {
+    return (
+      <main className="setup-shell topic-selection-shell" style={cssVars}>
+        <header className="console-header">
+          <Link href="/" className="console-brand"><span className="brand-mark">I</span><span>ITAMMUN</span></Link>
+          <div className="committee-heading"><span>{secretariat}</span><h1>{abbreviation}</h1></div>
+          <div className="header-actions"><span className="setup-step">{sessionDisplayTitle}</span><LanguageSwitcher dark /></div>
+        </header>
+        <section className="topic-selection-panel">
+          <span className="section-kicker">{t("firstSessionOnly")}</span>
+          <h2>{t("chooseDebateTopic")}</h2>
+          <p>{t("chooseDebateTopicHelp")}</p>
+          <div className="topic-option-grid">
+            {detail.topics.map((topic) => <button key={topic.id} type="button" onClick={() => chooseTopic(topic)}><span>{t("catalogTopic")}</span><strong>{topicDisplayTitle(topic, language)}</strong></button>)}
+            <button type="button" className={customTopicMode ? "active" : ""} onClick={() => setCustomTopicMode(true)}><span>{t("customTopic")}</span><strong>{t("additionalTopic")}</strong></button>
+          </div>
+          {customTopicMode && <form className="custom-topic-form" onSubmit={(event) => { event.preventDefault(); chooseTopic(topicDraft); }}><label htmlFor="custom-topic">{t("additionalTopicName")}</label><div><input id="custom-topic" autoFocus value={topicDraft} onChange={(event) => setTopicDraft(event.target.value)} placeholder={t("writeTopic")} /><button className="primary-button" disabled={!topicDraft.trim()}>{t("continueToDebate")}</button></div></form>}
+          {detail.topics.length === 0 && !customTopicMode && <p className="module-note">{t("noCatalogTopics")}</p>}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="console-shell" style={cssVars}>
       <header className="console-header">
@@ -437,7 +658,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
 
       <section className="session-identity-strip">
         <span className="section-kicker">{t("sessionTitle")}</span>
-        <strong>{state.session.title || t("sessionTitle")}</strong>
+        <strong>{sessionDisplayTitle}</strong>
         {state.session.startedAt && <time dateTime={state.session.startedAt}>{new Intl.DateTimeFormat(language === "es" ? "es-MX" : "en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Mexico_City" }).format(new Date(state.session.startedAt))}</time>}
         {closeStatus === "error" && <p className="attendance-save-error" role="alert">{t(closeError === "conflict" ? "attendanceConflict" : "attendanceSaveError")}</p>}
       </section>
@@ -448,46 +669,14 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
       </section>
 
       <nav className="console-tabs" aria-label={t("committeeModules")}>
-        {tabIds.map((tabId) => {
-          const disabled = tabId !== "rollcall" && !state.topic;
-          return <button key={tabId} disabled={disabled} title={disabled ? t("defineTopicHint") : undefined} className={activeTab === tabId ? "active" : ""} onClick={() => setActiveTab(tabId)}>{tabLabels[tabId]}</button>;
-        })}
+        {tabIds.map((tabId) => <button key={tabId} className={activeTab === tabId ? "active" : ""} onClick={() => setActiveTab(tabId)}>{tabLabels[tabId]}</button>)}
       </nav>
 
       <div className="console-workspace">
-        {activeTab === "rollcall" && (
+        {activeTab === "warnings" && (
           <section className="module-panel rollcall-module">
-            <div className="module-title-row"><div><span className="section-kicker">{t("alwaysEditable")}</span><h2>{t("rollCall")}</h2></div><div className={`quorum-pill ${attendance.quorum ? "has-quorum" : ""}`}>{t("inRoomQuorum", { inRoom: attendance.inRoom, total: state.participants.length, quorum: t(attendance.quorum ? "hasQuorum" : "noQuorum") })}</div></div>
-            <div className="console-subtabs" role="group" aria-label={t("rollCall")}><button className={rollCallView === "attendance" ? "active" : ""} onClick={() => setRollCallView("attendance")}>{t("attendanceView")}</button><button className={rollCallView === "warnings" ? "active" : ""} onClick={() => setRollCallView("warnings")}>{t("warningsView")}</button></div>
-
-            {rollCallView === "attendance" ? <>
-              <div className="attendance-summary"><span>{t("inRoom")} <strong>{attendance.inRoom}</strong></span><span>{t("presentAndVoting")} <strong>{attendance.voting}</strong></span><span>{t("simpleMajority")} <strong>{Math.floor(attendance.voting / 2) + 1}</strong></span><span>{t("qualifiedMajority")} <strong>{Math.ceil(attendance.voting * 2 / 3)}</strong></span></div>
-              <section className={`topic-editor ${topicLocked ? "is-locked" : ""}`}>
-                <div><span className="section-kicker">{t("sessionTopic")}</span><h3>{displayedTopic || t("selectOrCreateTopic")}</h3>{topicLocked && <p>{t("emptyQueueToChangeTopic")}</p>}</div>
-                <div className="topic-editor-controls">
-                  {detail.topics.length > 0 && <select aria-label={t("sessionTopic")} disabled={topicLocked} value={topicSelectValue} onChange={(event) => {
-                    if (event.target.value === "__custom") { setTopicDraft(state.topic && !knownTopic ? state.topic : ""); setCustomTopicMode(true); return; }
-                    const topic = detail.topics.find((item) => item.id === event.target.value);
-                    setCustomTopicMode(false); setTopicDraft(""); if (topic) updateTopic(topic);
-                  }}><option value="">{t("selectTopic")}</option>{detail.topics.map((topic) => <option key={topic.id} value={topic.id}>{topicDisplayTitle(topic, language)}</option>)}<option value="__custom">{t("writeOtherTopic")}</option></select>}
-                  {(detail.topics.length === 0 || customTopicMode || (state.topic && !knownTopic)) && <form onSubmit={(event) => {
-                    event.preventDefault(); const topic = topicDraft.trim(); if (!topic || topicLocked) return; updateTopic(topic); setTopicDraft(topic); setCustomTopicMode(false);
-                  }}><input disabled={topicLocked} value={topicDraft} onChange={(event) => setTopicDraft(event.target.value)} placeholder={t("writeTopic")} aria-label={t("newTopic")} /><button type="submit" disabled={topicLocked || !topicDraft.trim()}>{t("defineTopic")}</button></form>}
-                </div>
-              </section>
-              <div className="attendance-list">{orderedParticipants.map((representation) => {
-                const value = state.attendance[representation.id] || "pending";
-                const initiallyAssigned = state.assignedParticipantIds.includes(representation.id);
-                return <article className="attendance-row" key={representation.id}>
-                  <div className="attendance-person">{representation.flagUrl && <Image src={representation.flagUrl} alt="" width={32} height={22} unoptimized />}<span>{representationPrimaryName(representation, language)}{representationSecondaryName(representation, language) && <small>{representationSecondaryName(representation, language)}</small>}</span><em>{t(initiallyAssigned ? "initialSeat" : "available")}</em></div>
-                  <div className="attendance-buttons" role="group" aria-label={t("attendanceFor", { name: representationFullName(representation, language) })}>{attendanceValues.map((option) => <button key={option} type="button" aria-pressed={value === option} className={`attendance-button status-${option}`} onClick={() => update((current) => ({ ...current, attendance: { ...current.attendance, [representation.id]: option } }))}>{attendanceLabels[option]}</button>)}<button type="button" className="attendance-clear" disabled={value === "pending"} onClick={() => update((current) => ({ ...current, attendance: { ...current.attendance, [representation.id]: "pending" } }))}>{t("clear")}</button></div>
-                </article>;
-              })}</div>
-              <section className="attendance-export-panel">
-                <div><span className="section-kicker">{t("attendanceReport")}</span><h3>{state.session.title || t("sessionTitle")}</h3><p>{t("attendanceReportHelp")}</p></div>
-                <button className="primary-button" type="button" onClick={exportAttendance}>{t("exportAttendanceCsv")}</button>
-              </section>
-            </> : <div className="warnings-panel">
+            <div className="module-title-row"><div><span className="section-kicker">{t("attendanceLocked")}</span><h2>{t("warningsView")}</h2></div></div>
+            <div className="warnings-panel">
               <p className="module-note">{t("warningsIntro")}</p>
               <div className="warnings-list">{orderedParticipants.map((participant) => {
                 const count = state.warnings[participant.id] ?? 0;
@@ -498,7 +687,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
                   <div><button className="warning-add" onClick={() => addWarning(participant.id, representationFullName(participant, language))}>{t("addWarning")}</button><button disabled={count === 0} onClick={() => undoWarning(participant.id, representationFullName(participant, language))}>{t("undoWarning")}</button></div>
                 </article>;
               })}</div>
-            </div>}
+            </div>
           </section>
         )}
 
@@ -506,13 +695,34 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
           <section className="speakers-module">
             <div className="console-subtabs speakers-subtabs" role="group" aria-label={t("speakers")}><button className={speakerView === "list" ? "active" : ""} onClick={() => setSpeakerView("list")}>{t("speakerListMode")}</button><button className={speakerView === "questions" ? "active" : ""} onClick={() => setSpeakerView("questions")}>{t("extraordinaryQuestions")}</button></div>
             {speakerView === "list" ? <div className="speakers-layout">
-              <div className="speaker-stage">
-                <div className="stage-label">{t("currentSpeaker")}</div><h2>{currentSpeakerName || t("noSpeaker")}</h2><div className="timer-display">{formatTime(remaining)}</div>
+              <div className={`speaker-stage ${interactionMode ? "interaction-stage" : ""}`}>
+                <div className="stage-label">{t(interactionMode ? state.currentSpeakerYield === "comments" ? "commentsWithSpeaker" : "questionsWithSpeaker" : "currentSpeaker", { name: currentSpeakerName })}</div>
+                <h2>{currentSpeakerName || t("noSpeaker")}</h2>
+                <div className="timer-display">{formatTime(remaining)}</div>
                 {state.currentSpeakerReceivedDonation && <span className="donation-note">{t("allottedWithDonation", { base: formatTime(state.speakerTime), donation: formatTime(Math.max(0, state.currentSpeakerAllottedTime - state.speakerTime)) })}</span>}
-                <TimeInput label={t("allottedTime")} seconds={state.speakerTime} onChange={(seconds) => { if (!state.currentSpeaker) setRemaining(seconds); update((current) => ({ ...current, speakerTime: seconds, currentSpeakerAllottedTime: current.currentSpeaker ? current.currentSpeakerAllottedTime : seconds })); }} compact />
-                <div className="primary-controls"><button onClick={() => { setRemaining(state.currentSpeaker ? state.currentSpeakerAllottedTime : state.speakerTime); setRunning(false); update((current) => ({ ...current, currentSpeakerYield: "none", pendingDonationSeconds: 0 })); }}>{t("reset")}</button><button className="primary-button" disabled={!state.currentSpeaker || (state.currentSpeakerYield !== "none" && state.currentSpeakerYield !== "questions")} onClick={() => setRunning((value) => !value)}>{t(running ? "pause" : "start")}</button><button disabled={state.speakers.length === 0} onClick={beginNextSpeaker}>{t("nextSpeaker")}</button></div>
-                {state.currentSpeakerYield !== "none" && <div className={`yield-status yield-status-${state.currentSpeakerYield}`}><strong>{t(state.currentSpeakerYield === "questions" ? "ordinaryQuestionsActive" : state.currentSpeakerYield === "next" ? "yieldRecordedNext" : "yieldRecordedChair")}</strong>{state.currentSpeakerYield === "questions" && <><span>{t("ordinaryQuestionsHelp")}</span><button type="button" onClick={() => { setRemaining(0); setRunning(false); }}>{t("finishOrdinaryQuestions")}</button></>}</div>}
-                {state.currentSpeaker && remaining > 0 && state.currentSpeakerYield === "none" && <div className="yield-panel"><span>{t("yieldRemainingTime")}</span><div><button onClick={yieldToQuestions}>{t("yieldToQuestions")}</button><button onClick={yieldToChair}>{t("yieldToChair")}</button><button disabled={state.speakers.length === 0 || state.currentSpeakerReceivedDonation} onClick={yieldToNextSpeaker}>{t("yieldToNextSpeaker")}</button></div></div>}
+
+                {interactionMode ? <>
+                  <p className="module-note">{t(state.currentSpeakerYield === "comments" ? "commentsTimeHelp" : "ordinaryQuestionsHelp")}</p>
+                  <div className="primary-controls interaction-controls">
+                    {remaining > 0 && <button className="primary-button" onClick={() => setSpeakerTimer({ running: !running })}>{t(running ? "pause" : "resume")}</button>}
+                    <button onClick={yieldToChair}>{t("yieldToChair")}</button>
+                  </div>
+                </> : state.currentSpeakerYield === "chair" || state.currentSpeakerYield === "donation" ? <>
+                  <div className={`yield-status yield-status-${state.currentSpeakerYield}`}><strong>{t(state.currentSpeakerYield === "donation" ? "yieldRecordedDelegation" : "yieldRecordedChair")}</strong></div>
+                  <div className="primary-controls"><button className="primary-button" disabled={state.speakers.length === 0} onClick={beginNextSpeaker}>{t("nextSpeaker")}</button></div>
+                </> : <>
+                  <TimeInput label={t("allottedTime")} seconds={state.speakerTime} onChange={(seconds) => update((current) => ({ ...current, speakerTime: seconds, currentSpeakerAllottedTime: current.currentSpeaker ? current.currentSpeakerAllottedTime : seconds, currentSpeakerRemainingTime: current.currentSpeaker ? current.currentSpeakerRemainingTime : seconds }))} compact />
+                  <div className="primary-controls">
+                    <button disabled={!state.currentSpeaker} onClick={() => update((current) => ({ ...current, currentSpeakerRemainingTime: current.currentSpeakerAllottedTime, currentSpeakerRunning: false, currentSpeakerYield: "none", yieldRecipientParticipantId: "", pendingDonationSeconds: 0 }))}>{t("reset")}</button>
+                    <button className="primary-button" disabled={!state.currentSpeaker || state.currentSpeakerYield !== "none" || remaining === 0} onClick={() => setSpeakerTimer({ running: !running })}>{t(running ? "pause" : "start")}</button>
+                    <button disabled={state.speakers.length === 0 || Boolean(state.currentSpeaker && remaining > 0)} onClick={beginNextSpeaker}>{t("nextSpeaker")}</button>
+                  </div>
+                  {state.currentSpeaker && remaining > 0 && state.currentSpeakerYield === "none" && <div className="yield-panel">
+                    <span>{t("yieldRemainingTime")}</span>
+                    <div className="yield-action-grid"><button onClick={yieldToQuestions}>{t("yieldToQuestions")}</button><button onClick={yieldToComments}>{t("yieldToComments")}</button><button onClick={yieldToChair}>{t("yieldToChair")}</button></div>
+                    <div className="directed-donation"><select value={donationParticipantId} onChange={(event) => setDonationParticipantId(event.target.value)} aria-label={t("donationRecipient")}><option value="">{t("selectDonationRecipient")}</option>{donationRecipients.map((participant) => <option key={participant.id} value={participant.id}>{representationFullName(participant, language)}{state.donatedSecondsByParticipantId[participant.id] ? ` (+${formatTime(state.donatedSecondsByParticipantId[participant.id])})` : ""}</option>)}</select><button disabled={!donationParticipantId || state.currentSpeakerReceivedDonation} onClick={yieldToDelegation}>{t("yieldToSelectedDelegation")}</button></div>
+                  </div>}
+                </>}
               </div>
               <div className="queue-panel">
                 <div className="panel-heading"><div><span className="section-kicker">{t("generalList")}</span><h2>{t("nextSpeakers")}</h2></div><span>{state.speakers.length}</span></div>
@@ -548,6 +758,19 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
           </section>
         )}
 
+        {activeTab === "unlimited-questions" && (
+          <section className="module-panel unlimited-questions-module">
+            <div className="module-title-row"><div><span className="section-kicker">{t("freeParticipation")}</span><h2>{t("unlimitedQuestionsSession")}</h2></div><span className="rule-tag">{t("noTimerNoQueue")}</span></div>
+            <p className="module-note">{t("unlimitedQuestionsHelp")}</p>
+            <div className="unlimited-document-grid">
+              {unlimitedDocuments.map((document) => <button key={document} type="button" className={state.unlimitedQuestionDocument === document ? "active" : ""} onClick={() => update((current) => ({ ...current, unlimitedQuestionDocument: document, unlimitedQuestionCustomLabel: "" }))}>{t(document === "working-a1" ? "workingPaperA1" : document === "working-b1" ? "workingPaperB1" : document === "possible-resolution-a1" ? "possibleResolutionA1" : "possibleResolutionB1")}</button>)}
+              <button type="button" className={state.unlimitedQuestionDocument === "custom" ? "active" : ""} onClick={() => update((current) => ({ ...current, unlimitedQuestionDocument: "custom" }))}>{t("customDocument")}</button>
+            </div>
+            {state.unlimitedQuestionDocument === "custom" && <label className="unlimited-custom-label">{t("customDocumentName")}<input value={state.unlimitedQuestionCustomLabel} onChange={(event) => update((current) => ({ ...current, unlimitedQuestionCustomLabel: event.target.value.slice(0, 300) }))} placeholder={t("customDocumentPlaceholder")} /></label>}
+            <div className="unlimited-current-selection"><span>{t("currentDocument")}</span><strong>{state.unlimitedQuestionDocument ? state.unlimitedQuestionDocument === "custom" ? state.unlimitedQuestionCustomLabel || t("pendingCustomDocument") : t(state.unlimitedQuestionDocument === "working-a1" ? "workingPaperA1" : state.unlimitedQuestionDocument === "working-b1" ? "workingPaperB1" : state.unlimitedQuestionDocument === "possible-resolution-a1" ? "possibleResolutionA1" : "possibleResolutionB1") : t("noDocumentSelected")}</strong></div>
+          </section>
+        )}
+
         {features.motionsAndAppeals && activeTab === "motions" && (
           <section className="module-panel motions-module">
             <div className="module-title-row"><div><span className="section-kicker">{t("immediateVote")}</span><h2>{t("appealsToChair")}</h2></div><span className="rule-tag">{t("onlyPresentAndVoting")}</span></div>
@@ -567,7 +790,7 @@ export function CommitteeConsole({ committee, detail, sessionKey }: {
         {activeTab === "voting" && (
           <section className="module-panel voting-module final-voting-module">
             <div className="module-title-row"><div><span className="section-kicker">{t("onlyPresentAndVoting")}</span><h2>{t("finalVoting")}</h2></div><a className="projector-link" href={`/comite/${sessionKey}/pantalla?nombre=${encodeURIComponent(committeeName)}`} target="_blank" rel="noreferrer">{t("openPublicScreen")}</a></div>
-            {state.finalVote.phase === "idle" && <div className="vote-start final-vote-start"><p>{t("finalVotingIntro")}</p><div className="final-topic-card"><span>{t("finalVoteTopic")}</span><strong>{displayedTopic}</strong></div><p>{t("eligibleCountries", { count: eligibleVoters.length })}</p><button className="primary-button" disabled={!state.topic || eligibleVoters.length === 0} onClick={beginFinalVote}>{t("startFinalVote", { count: eligibleVoters.length })}</button>{eligibleVoters.length === 0 && <button className="inline-link" onClick={() => setActiveTab("rollcall")}>{t("goToRollCall")}</button>}</div>}
+            {state.finalVote.phase === "idle" && <div className="vote-start final-vote-start"><p>{t("finalVotingIntro")}</p><div className="final-topic-card"><span>{t("finalVoteTopic")}</span><strong>{displayedTopic}</strong></div><p>{t("eligibleCountries", { count: eligibleVoters.length })}</p><button className="primary-button" disabled={!state.topic || eligibleVoters.length === 0} onClick={beginFinalVote}>{t("startFinalVote", { count: eligibleVoters.length })}</button>{eligibleVoters.length === 0 && <p className="module-note">{t("attendanceLockedNoVoters")}</p>}</div>}
             {(state.finalVote.phase === "round-one" || state.finalVote.phase === "round-two" || state.finalVote.phase === "round-three") && finalVoteParticipant && <div className="nominal-vote final-vote-stage">
               <div className="vote-progress">{t("roundProgress", { round: t(state.finalVote.phase === "round-one" ? "finalRoundOne" : state.finalVote.phase === "round-two" ? "finalRoundTwo" : "finalRoundThree"), current: state.finalVote.currentIndex + 1, total: state.finalVote.queue.length })}</div>
               {finalVoteParticipant.flagUrl && <Image src={finalVoteParticipant.flagUrl} alt="" width={96} height={64} unoptimized />}<span>{t("castingVote")}</span><h2>{representationFullName(finalVoteParticipant, language)}</h2><p>{displayedTopic || state.finalVote.label}</p>{(state.warnings[finalVoteParticipant.id] ?? 0) > 0 && <strong className="warning-badge">{disciplinaryLabel(state.warnings[finalVoteParticipant.id])}</strong>}

@@ -46,31 +46,24 @@ test("links every official committee to a shareable route", async () => {
     "onu-mujeres", "acnur", "unicef", "cij", "onudi", "cepa",
     "banco-mundial", "consejo-de-seguridad", "interpol", "otan",
   ];
-  for (const slug of slugs) assert.match(html, new RegExp(`href="/comite/${slug}/setup"`));
+  for (const slug of slugs) assert.match(html, new RegExp(`href="/comite/${slug}"`));
 });
 
-test("renders setup and projector routes", async () => {
+test("redirects legacy setup and renders staged attendance and projector routes", async () => {
   const setup = await renderProtected("/comite/onu-mujeres/setup");
-  assert.equal(setup.status, 200);
-  const setupHtml = await setup.text();
-  assert.match(setupHtml, /Confirma los cupos ocupados al inicio/);
-  assert.match(setupHtml, /aria-label="Idioma \/ Language"/);
-  assert.doesNotMatch(setupHtml, /Cupo asignado|Disponible/);
-  assert.match(setupHtml, /Catálogo de ITAMMUN actualizado|No fue posible cargar el catálogo de ITAMMUN/);
-  assert.match(setupHtml, /Título de la sesión/);
-  assert.doesNotMatch(setupHtml, /Tema de la sesión/);
+  assert.equal(setup.status, 307);
+  assert.match(setup.headers.get("location") ?? "", /\/comite\/onu-mujeres$/);
 
   const consoleResponse = await renderProtected("/comite/onu-mujeres");
   assert.equal(consoleResponse.status, 200);
   const consoleHtml = await consoleResponse.text();
-  assert.match(consoleHtml, /Pase de lista/);
+  assert.match(consoleHtml, /Registra la asistencia antes de iniciar/);
+  assert.match(consoleHtml, /Seleccionar sesión de trabajo/);
   assert.match(consoleHtml, /Presente y votando/);
   assert.match(consoleHtml, /Observador/);
-  assert.match(consoleHtml, /Llamadas de atención/);
-  assert.match(consoleHtml, /Votación final/);
-  assert.match(consoleHtml, /Finalizar sesión/);
+  assert.match(consoleHtml, /Agregar representación disponible del catálogo|No fue posible cargar el catálogo/);
+  assert.doesNotMatch(consoleHtml, /Votación final/);
   assert.doesNotMatch(consoleHtml, />Mociones</);
-  assert.match(consoleHtml, /Pendiente · defínelo/);
   assert.doesNotMatch(consoleHtml, /Tiempo por orador/);
 
   const projector = await renderProtected("/comite/onu-mujeres/pantalla");

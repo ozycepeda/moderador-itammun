@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeSessionState } from "../lib/session-migration";
-import { createInitialState, type SessionState } from "../lib/session-state";
+import { createInitialState, sessionNumberFromTitle, type SessionState } from "../lib/session-state";
 import { selectedParticipants } from "../lib/participant-selection";
 import { setupStorageKey, type StoredSetup } from "../lib/setup-state";
 
@@ -21,7 +21,13 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
   useEffect(() => {
     const storedSession = window.localStorage.getItem(sessionStorageKey(sessionKey));
     if (storedSession) {
-      try { setState(normalizeSessionState(JSON.parse(storedSession), initialStateRef.current)); } catch { /* ignore invalid local data */ }
+      try { setState(normalizeSessionState(JSON.parse(storedSession), initialStateRef.current)); } catch {
+        window.localStorage.removeItem(sessionStorageKey(sessionKey));
+        setState({
+          ...initialStateRef.current,
+          session: { ...initialStateRef.current.session, id: crypto.randomUUID(), startedAt: new Date().toISOString() },
+        });
+      }
     } else {
       const rawSetup = window.localStorage.getItem(setupStorageKey(sessionKey));
       if (rawSetup) {
@@ -34,12 +40,29 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
             session: {
               id: setup.sessionId ?? crypto.randomUUID(),
               title: setup.sessionTitle ?? "",
+              number: sessionNumberFromTitle(setup.sessionTitle ?? ""),
               startedAt: setup.createdAt || new Date().toISOString(),
             },
             topic: setup.topic ?? "",
+            phase: setup.topic ? "debate" : "attendance",
             assignedParticipantIds,
           });
-        } catch { /* keep the empty initial state */ }
+        } catch {
+          window.localStorage.removeItem(setupStorageKey(sessionKey));
+          setState({
+            ...initialStateRef.current,
+            session: { ...initialStateRef.current.session, id: crypto.randomUUID(), startedAt: new Date().toISOString() },
+          });
+        }
+      } else {
+        setState({
+          ...initialStateRef.current,
+          session: {
+            ...initialStateRef.current.session,
+            id: crypto.randomUUID(),
+            startedAt: new Date().toISOString(),
+          },
+        });
       }
     }
     setHydrated(true);

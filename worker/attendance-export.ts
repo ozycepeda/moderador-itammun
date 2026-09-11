@@ -1,4 +1,5 @@
 import type { Language } from "../app/lib/i18n";
+import { localizedSessionTitle } from "../app/lib/session-state";
 import type { AttendanceExportRow } from "./attendance-store";
 
 const headers = {
@@ -35,7 +36,7 @@ export function buildAdminAttendanceCsv(rows: AttendanceExportRow[], language: L
     return [
       language === "es" ? row.committeeNameEs : row.committeeNameEn,
       language === "es" ? row.committeeAbbreviationEs : row.committeeAbbreviationEn,
-      row.title,
+      localizedSessionTitle(row.title, language),
       row.id,
       row.startedAt,
       row.closedAt,

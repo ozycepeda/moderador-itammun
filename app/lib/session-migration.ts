@@ -2,10 +2,12 @@ import { isTranslationKey } from "./i18n";
 import { selectedParticipants } from "./participant-selection";
 import {
   createInitialFinalVoteState,
+  sessionNumberFromTitle,
   type AttendanceStatus,
   type FinalVoteRoundOneChoice,
   type FinalVoteRoundTwoChoice,
   type SessionEvent,
+  type ConsoleTab,
   type SessionState,
   type SpeakerYieldDestination,
   type SpeakerQueueItem,
@@ -86,7 +88,8 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
   const moderatedDuration = stored.caucuses?.moderated?.duration ?? stored.caucusDuration ?? fallback.caucuses.moderated.duration;
   const moderatedExtension = stored.caucuses?.moderated?.extension ?? stored.caucusExtension ?? Math.max(0, moderatedDuration - 1);
   const storedSession = stored.session;
-  const validYields = new Set<SpeakerYieldDestination>(["none", "chair", "next", "questions"]);
+  const validYields = new Set<SpeakerYieldDestination>(["none", "chair", "donation", "questions", "comments"]);
+  const validModules = new Set<ConsoleTab>(["speakers", "warnings", "caucus", "motions", "unlimited-questions", "voting", "log"]);
   const currentSpeakerParticipantId = typeof stored.currentSpeakerParticipantId === "string" && activeParticipantIds.has(stored.currentSpeakerParticipantId)
     ? stored.currentSpeakerParticipantId
     : participants.find((participant) => participant.name === stored.currentSpeaker)?.id ?? "";
@@ -97,18 +100,26 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
     ? {
         id: typeof storedSession.id === "string" && storedSession.id ? storedSession.id : crypto.randomUUID(),
         title: typeof storedSession.title === "string" ? storedSession.title : "",
+        number: typeof storedSession.number === "number" && storedSession.number >= 1 && storedSession.number <= 7
+          ? storedSession.number as 1 | 2 | 3 | 4 | 5 | 6 | 7
+          : sessionNumberFromTitle(typeof storedSession.title === "string" ? storedSession.title : "") || (stored.topic ? 1 as const : 0 as const),
         startedAt: typeof storedSession.startedAt === "string" && storedSession.startedAt ? storedSession.startedAt : new Date().toISOString(),
       }
     : {
         id: crypto.randomUUID(),
         title: "",
+        number: 0 as const,
         startedAt: new Date().toISOString(),
       };
 
   return {
     ...fallback,
     ...stored,
-    schemaVersion: 5,
+    schemaVersion: 6,
+    phase: stored.phase === "attendance" || stored.phase === "topic-selection" || stored.phase === "debate"
+      ? stored.phase
+      : stored.topic ? "debate" : "attendance",
+    activeModule: validModules.has(stored.activeModule as ConsoleTab) ? stored.activeModule as ConsoleTab : "speakers",
     session,
     topicId: typeof stored.topicId === "string" ? stored.topicId : "",
     topicByLanguage: stored.topicByLanguage && typeof stored.topicByLanguage === "object"
@@ -126,7 +137,19 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
     currentSpeakerYield: currentSpeakerParticipantId && validYields.has(stored.currentSpeakerYield as SpeakerYieldDestination)
       ? stored.currentSpeakerYield as SpeakerYieldDestination
       : "none",
+    currentSpeakerRemainingTime: currentSpeakerParticipantId && typeof stored.currentSpeakerRemainingTime === "number"
+      ? Math.max(0, stored.currentSpeakerRemainingTime)
+      : currentSpeakerParticipantId ? Math.max(0, stored.currentSpeakerAllottedTime ?? stored.speakerTime ?? fallback.speakerTime) : fallback.speakerTime,
+    currentSpeakerRunning: Boolean(currentSpeakerParticipantId && stored.currentSpeakerRunning === true),
+    yieldRecipientParticipantId: typeof stored.yieldRecipientParticipantId === "string" && activeParticipantIds.has(stored.yieldRecipientParticipantId)
+      ? stored.yieldRecipientParticipantId
+      : "",
+    donatedSecondsByParticipantId: Object.fromEntries(Object.entries(stored.donatedSecondsByParticipantId ?? {}).filter((entry): entry is [string, number] => activeParticipantIds.has(entry[0]) && typeof entry[1] === "number" && entry[1] > 0)),
     pendingDonationSeconds: currentSpeakerParticipantId && typeof stored.pendingDonationSeconds === "number" ? Math.max(0, stored.pendingDonationSeconds) : 0,
+    unlimitedQuestionDocument: stored.unlimitedQuestionDocument === "working-a1" || stored.unlimitedQuestionDocument === "working-b1" || stored.unlimitedQuestionDocument === "possible-resolution-a1" || stored.unlimitedQuestionDocument === "possible-resolution-b1" || stored.unlimitedQuestionDocument === "custom"
+      ? stored.unlimitedQuestionDocument
+      : "",
+    unlimitedQuestionCustomLabel: typeof stored.unlimitedQuestionCustomLabel === "string" ? stored.unlimitedQuestionCustomLabel.slice(0, 300) : "",
     warnings: Object.fromEntries(Object.entries(stored.warnings ?? {}).filter((entry): entry is [string, number] => activeParticipantIds.has(entry[0]) && typeof entry[1] === "number" && entry[1] >= 0)),
     caucuses: {
       moderated: { duration: moderatedDuration, extension: moderatedExtension },

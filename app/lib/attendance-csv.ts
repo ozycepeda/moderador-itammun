@@ -2,7 +2,7 @@ import { committeeDisplayAbbreviation, committeeDisplayName, type Committee } fr
 import type { Language } from "./i18n";
 import { representationFullName } from "./itammun-api";
 import type { AttendanceStatus, SessionState } from "./session-state";
-import { getDisciplinaryCounts } from "./session-state";
+import { getDisciplinaryCounts, localizedSessionTitle } from "./session-state";
 
 const headers = {
   es: ["Comité", "Abreviatura", "Título de sesión", "ID de sesión", "Inicio", "Exportado", "País o representación", "Estado de asistencia", "Cupo inicial", "Observador", "Llamadas acumuladas", "Warnings activos", "Faltas"],
@@ -36,7 +36,7 @@ export function buildAttendanceCsv({ committee, state, language, exportedAt = ne
     return [
       committeeDisplayName(committee, language),
       committeeDisplayAbbreviation(committee, language),
-      state.session.title,
+      localizedSessionTitle(state.session.title, language),
       state.session.id,
       state.session.startedAt,
       exportedAt,

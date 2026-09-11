@@ -10,6 +10,9 @@ import {
   createInitialState,
   getDisciplinaryCounts,
   isParticipantInDebate,
+  localizedSessionTitle,
+  sessionNumberFromTitle,
+  sessionTitle,
   startFinalVote,
 } from "../app/lib/session-state.ts";
 import { normalizeSessionState } from "../app/lib/session-migration.ts";
@@ -65,7 +68,8 @@ test("migrates version two sessions without losing debate state", () => {
     warnings: { mx: 4 },
   }, fallback);
 
-  assert.equal(migrated.schemaVersion, 5);
+  assert.equal(migrated.schemaVersion, 6);
+  assert.equal(migrated.phase, "debate");
   assert.equal(migrated.topic, "Migración");
   assert.equal(migrated.speakers[0].participantId, "mx");
   assert.equal(migrated.caucuses.moderated.duration, 420);
@@ -150,16 +154,39 @@ test("keeps the current speaker visible after yielding and advances only on requ
   state.currentSpeakerParticipantId = "mx";
   state.speakers = [{ id: "next", participantId: "fr", name: "Francia", bonusSeconds: 0 }];
 
-  const yielded = applySpeakerYield(state, "next", 17);
+  const yielded = applySpeakerYield(state, "donation", 17, "fr");
   assert.equal(yielded.currentSpeaker, "México");
-  assert.equal(yielded.currentSpeakerYield, "next");
-  assert.equal(yielded.pendingDonationSeconds, 17);
+  assert.equal(yielded.currentSpeakerYield, "donation");
+  assert.equal(yielded.donatedSecondsByParticipantId.fr, 17);
+  assert.equal(yielded.currentSpeakerRemainingTime, 0);
   assert.equal(yielded.speakers.length, 1);
 
   const advanced = advanceToNextSpeaker(yielded);
   assert.equal(advanced.currentSpeaker, "Francia");
   assert.equal(advanced.currentSpeakerAllottedTime, 77);
+  assert.equal(advanced.currentSpeakerRemainingTime, 77);
+  assert.deepEqual(advanced.donatedSecondsByParticipantId, {});
   assert.equal(advanced.currentSpeakerYield, "none");
   assert.equal(advanced.pendingDonationSeconds, 0);
   assert.equal(advanced.speakers.length, 0);
+});
+
+test("accumulates directed donations and prevents donated time from being donated again", () => {
+  const state = createInitialState([]);
+  state.currentSpeaker = "México";
+  state.currentSpeakerParticipantId = "mx";
+  state.donatedSecondsByParticipantId = { fr: 8 };
+  const donated = applySpeakerYield(state, "donation", 12, "fr");
+  assert.equal(donated.donatedSecondsByParticipantId.fr, 20);
+
+  donated.currentSpeakerReceivedDonation = true;
+  const rejected = applySpeakerYield(donated, "donation", 5, "ca");
+  assert.equal(rejected.donatedSecondsByParticipantId.ca, undefined);
+});
+
+test("uses the seven constrained working-session titles in both languages", () => {
+  assert.equal(sessionTitle(7, "es"), "Sesión 7 de trabajo");
+  assert.equal(sessionTitle(7, "en"), "Working session 7");
+  assert.equal(sessionNumberFromTitle("Sesión 3 de trabajo"), 3);
+  assert.equal(localizedSessionTitle("Sesión 3 de trabajo", "en"), "Working session 3");
 });

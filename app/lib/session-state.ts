@@ -3,10 +3,13 @@ import type { TranslationKey } from "./i18n";
 import type { LocalizedText } from "./catalog-translations";
 
 export type AttendanceStatus = "pending" | "absent" | "present" | "present-voting" | "observer";
-export type ConsoleTab = "speakers" | "rollcall" | "caucus" | "motions" | "voting" | "log";
+export type ConsoleTab = "speakers" | "warnings" | "caucus" | "motions" | "unlimited-questions" | "voting" | "log";
 export type VoteChoice = "for" | "against";
 export type CaucusMode = "moderated" | "simple";
-export type SpeakerYieldDestination = "none" | "chair" | "next" | "questions";
+export type SpeakerYieldDestination = "none" | "chair" | "donation" | "questions" | "comments";
+export type SessionPhase = "attendance" | "topic-selection" | "debate";
+export type SessionNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type UnlimitedQuestionDocument = "working-a1" | "working-b1" | "possible-resolution-a1" | "possible-resolution-b1" | "custom" | "";
 
 export type SpeakerQueueItem = {
   id: string;
@@ -70,11 +73,14 @@ export type CaucusState = {
 export type SessionMetadata = {
   id: string;
   title: string;
+  number: SessionNumber | 0;
   startedAt: string;
 };
 
 export type SessionState = {
-  schemaVersion: 5;
+  schemaVersion: 6;
+  phase: SessionPhase;
+  activeModule: ConsoleTab;
   session: SessionMetadata;
   topic: string;
   topicId: string;
@@ -85,13 +91,19 @@ export type SessionState = {
   currentSpeaker: string;
   currentSpeakerParticipantId: string;
   currentSpeakerAllottedTime: number;
+  currentSpeakerRemainingTime: number;
+  currentSpeakerRunning: boolean;
   currentSpeakerReceivedDonation: boolean;
   currentSpeakerYield: SpeakerYieldDestination;
+  yieldRecipientParticipantId: string;
+  donatedSecondsByParticipantId: Record<string, number>;
   pendingDonationSeconds: number;
   speakerTime: number;
   questionQueue: SpeakerQueueItem[];
   currentQuestioner: string;
   currentQuestionerParticipantId: string;
+  unlimitedQuestionDocument: UnlimitedQuestionDocument;
+  unlimitedQuestionCustomLabel: string;
   attendance: Record<string, AttendanceStatus>;
   warnings: Record<string, number>;
   caucuses: Record<CaucusMode, CaucusState>;
@@ -186,8 +198,10 @@ export function advanceFinalVoteStage(vote: FinalVoteState): FinalVoteState {
 export function createInitialState(representations: Representation[]): SessionState {
   const defaultCaucus = { duration: 600, extension: 599 };
   return {
-    schemaVersion: 5,
-    session: { id: "", title: "", startedAt: "" },
+    schemaVersion: 6,
+    phase: "attendance",
+    activeModule: "speakers",
+    session: { id: "", title: "", number: 0, startedAt: "" },
     topic: "",
     topicId: "",
     topicByLanguage: undefined,
@@ -197,13 +211,19 @@ export function createInitialState(representations: Representation[]): SessionSt
     currentSpeaker: "",
     currentSpeakerParticipantId: "",
     currentSpeakerAllottedTime: 60,
+    currentSpeakerRemainingTime: 60,
+    currentSpeakerRunning: false,
     currentSpeakerReceivedDonation: false,
     currentSpeakerYield: "none",
+    yieldRecipientParticipantId: "",
+    donatedSecondsByParticipantId: {},
     pendingDonationSeconds: 0,
     speakerTime: 60,
     questionQueue: [],
     currentQuestioner: "",
     currentQuestionerParticipantId: "",
+    unlimitedQuestionDocument: "",
+    unlimitedQuestionCustomLabel: "",
     attendance: Object.fromEntries(representations.map((representation) => [
       representation.id,
       representation.observer ? "observer" : "pending",
@@ -225,34 +245,75 @@ export function applySpeakerYield(
   state: SessionState,
   destination: Exclude<SpeakerYieldDestination, "none">,
   remainingSeconds: number,
+  recipientParticipantId = "",
 ) {
-  if (!state.currentSpeaker || remainingSeconds <= 0) return state;
+  if (!state.currentSpeaker || (remainingSeconds <= 0 && destination !== "chair")) return state;
+  if (destination === "donation") {
+    if (!recipientParticipantId || recipientParticipantId === state.currentSpeakerParticipantId || state.currentSpeakerReceivedDonation) return state;
+    return {
+      ...state,
+      currentSpeakerYield: destination,
+      currentSpeakerRemainingTime: 0,
+      currentSpeakerRunning: false,
+      yieldRecipientParticipantId: recipientParticipantId,
+      donatedSecondsByParticipantId: {
+        ...state.donatedSecondsByParticipantId,
+        [recipientParticipantId]: (state.donatedSecondsByParticipantId[recipientParticipantId] ?? 0) + Math.max(0, remainingSeconds),
+      },
+      pendingDonationSeconds: 0,
+    };
+  }
   return {
     ...state,
     currentSpeakerYield: destination,
-    pendingDonationSeconds: destination === "next" ? Math.max(0, remainingSeconds) : 0,
+    currentSpeakerRemainingTime: destination === "chair" ? 0 : Math.max(0, remainingSeconds),
+    currentSpeakerRunning: false,
+    yieldRecipientParticipantId: "",
+    pendingDonationSeconds: 0,
   };
 }
 
 export function advanceToNextSpeaker(state: SessionState) {
   const next = state.speakers[0];
   if (!next) return state;
-  const donatedSeconds = state.currentSpeakerYield === "next" ? state.pendingDonationSeconds : 0;
+  const donatedSeconds = next.participantId ? state.donatedSecondsByParticipantId[next.participantId] ?? 0 : 0;
   const queuedBonus = next.bonusSeconds ?? 0;
   const allotted = state.speakerTime + queuedBonus + donatedSeconds;
+  const donatedSecondsByParticipantId = { ...state.donatedSecondsByParticipantId };
+  if (next.participantId) delete donatedSecondsByParticipantId[next.participantId];
   return {
     ...state,
     speakers: state.speakers.slice(1),
     currentSpeaker: next.name,
     currentSpeakerParticipantId: next.participantId ?? "",
     currentSpeakerAllottedTime: allotted,
+    currentSpeakerRemainingTime: allotted,
+    currentSpeakerRunning: false,
     currentSpeakerReceivedDonation: donatedSeconds > 0 || queuedBonus > 0,
     currentSpeakerYield: "none" as const,
+    yieldRecipientParticipantId: "",
+    donatedSecondsByParticipantId,
     pendingDonationSeconds: 0,
     questionQueue: [],
     currentQuestioner: "",
     currentQuestionerParticipantId: "",
   };
+}
+
+export function sessionTitle(number: SessionNumber, language: "es" | "en") {
+  return language === "es" ? `Sesión ${number} de trabajo` : `Working session ${number}`;
+}
+
+export function sessionNumberFromTitle(title: string): SessionNumber | 0 {
+  const match = title.match(/(?:sesión|session)\s+([1-7])/i);
+  const number = Number(match?.[1]);
+  return number >= 1 && number <= 7 ? number as SessionNumber : 0;
+}
+
+export function localizedSessionTitle(title: string, language: "es" | "en") {
+  const match = title.trim().match(/^(?:sesión\s+([1-7])\s+de\s+trabajo|working\s+session\s+([1-7]))$/i);
+  const number = Number(match?.[1] ?? match?.[2]) as SessionNumber;
+  return number ? sessionTitle(number, language) : title;
 }
 
 export function getDisciplinaryCounts(totalWarnings: number) {
