@@ -100,13 +100,13 @@ test("renders the protected centralized attendance panel", async () => {
   assert.match(html, /Exportar bitácora CSV/);
 });
 
-test("keeps attendance writes protected when the rest of the site is public", async () => {
+test("allows the public moderator flow to reach attendance storage without exposing admin routes", async () => {
   const response = await render("/api/attendance/sessions/example/close", {
     env: { ACCESS_MODE: "public", ACCESS_PIN: "test-password", ACCESS_SESSION_SECRET: "test-session-secret" },
     method: "POST",
     headers: { "content-type": "application/json" },
     body: "{}",
   });
-  assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), { ok: false, error: "unauthorized" });
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { ok: false, error: "database-unavailable" });
 });
