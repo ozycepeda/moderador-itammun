@@ -7,11 +7,14 @@ Aplicación para preparar y conducir debates de ITAMMUN. El catálogo de comité
 - Acceso general protegido por una contraseña compartida, sin cuentas individuales.
 - Inicio con diez comités y lienzo en blanco.
 - Interfaz completa en español e inglés con preferencia persistente entre páginas y pestañas.
-- Setup obligatorio con título de sesión; sólo los cupos `occupied` llegan preseleccionados y el catálogo completo permanece disponible durante la preparación. Únicamente las representaciones marcadas pasan al debate, pase de lista y CSV.
-- Pase de lista siempre editable con botones de estado; después se elige o crea el tópico.
-- Lista de oradores limitada a participantes en sala y reordenable. El orador puede ceder a preguntas y respuestas, a la Mesa o al siguiente turno.
+- Flujo previo obligatorio dentro de la ruta del comité: se elige una de siete categorías `Sesión {x} de trabajo`, sólo los cupos `occupied` llegan incluidos y se puede agregar una representación disponible o una persona nueva antes de pasar lista.
+- La consola se abre únicamente cuando todas las personas tienen estado y existe quórum. Al iniciar, la asistencia queda bloqueada y el módulo principal conserva sólo las llamadas de atención.
+- En la sesión 1 se elige un tópico del catálogo o se escribe uno adicional. Las sesiones 2–7 recuperan el último tópico cerrado del comité desde D1, con respaldo local.
+- Lista de oradores limitada a participantes en sala y reordenable. El siguiente orador sólo puede iniciar con el reloj en cero.
+- El orador puede ceder a preguntas y respuestas, comentarios, la Mesa o una delegación elegida. Las donaciones se acumulan hasta el próximo turno de la delegación y el tiempo recibido no puede volver a donarse.
 - Preguntas y respuestas ordinarias usan el remanente del orador; la sesión extraordinaria mantiene una cola independiente sin cronómetro.
 - Caucus moderado y caucus simple con cronómetros independientes y extensión de un segundo menos.
+- Sesión extraordinaria de preguntas ilimitadas sin cronómetro ni cola, con selección del documento en discusión.
 - Cada cuatro llamadas de atención generan una falta; ambas cifras aparecen en la consola y en votaciones.
 - Exportación CSV de asistencia por sesión con todos los países, estado, warnings y faltas.
 - Cierre seguro e idempotente: D1 confirma un recibo antes de borrar el debate local; ante un error se conserva la sesión y se genera el CSV de respaldo.
@@ -52,7 +55,9 @@ La aplicación obtiene el catálogo exclusivamente a través de HTTPS:
 https://itammun.itam.mx/api/public/debates/<uuid-del-comité>
 ```
 
-`ITAMMUN_API_BASE_URL` permite cambiar la URL en el futuro. No coloques credenciales de phpMyAdmin, MySQL o PostgreSQL en este repositorio: el navegador y la aplicación sólo necesitan el API público de lectura. Si el API no responde, el setup muestra un error y no sustituye silenciosamente países reales por datos de prueba.
+`ITAMMUN_API_BASE_URL` permite cambiar la URL en el futuro. No coloques credenciales de phpMyAdmin, MySQL o PostgreSQL en este repositorio: el navegador y la aplicación sólo necesitan el API público de lectura. Si el API no responde, la asistencia previa muestra un error y no sustituye silenciosamente países reales por datos de prueba.
+
+Las siete etiquetas de sesión se generan en `app/lib/session-state.ts`, mediante `sessionTitle`. Ahí se puede cambiar la nomenclatura futura sin modificar la base ni los CSV guardados.
 
 ### PostgreSQL de prueba heredado
 
@@ -69,12 +74,13 @@ El SQL y [`app/lib/test-catalog.ts`](app/lib/test-catalog.ts) se conservan como 
 
 - Setup: `localStorage[itammun:setup:<slug>]`.
 - Debate: `localStorage[itammun:session:<slug>]`.
+- Respaldo del tópico vigente: `localStorage[itammun:committee-topic:<slug>]`.
 - Idioma: `localStorage[itammun:language]` (`es` o `en`).
 - Finalizar la sesión pide confirmación, envía a D1 un snapshot de todos los participantes y estados, recibe un comprobante, descarga el mismo CSV del pase de lista, elimina el debate local y regresa al selector.
 - Si el guardado central falla, la sesión no se elimina y puede reintentarse. El CSV de emergencia se descarga de todos modos.
-- Reiniciar el setup del mismo comité reemplaza el debate local anterior.
+- Después de cerrar una sesión, volver a elegir el comité crea una asistencia nueva y conserva únicamente el tópico de referencia.
 - Abrir la misma URL en otro dispositivo no comparte votos, asistencia ni oradores.
-- `Compartir` copia el enlace de setup del comité para que otra persona cree su propia sesión local.
+- `Compartir` copia el enlace directo del comité para que otra persona cree su propia sesión local.
 - Cada sesión recibe un UUID, título obligatorio y fechas de inicio/cierre. D1 conserva el cierre durante seis meses; la depuración ocurre al guardar o consultar la bitácora.
 - D1 usa tablas operativas separadas del catálogo PostgreSQL/MySQL institucional. El navegador nunca recibe credenciales de base de datos.
 
