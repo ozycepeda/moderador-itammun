@@ -148,6 +148,22 @@ test("removes unchecked participants from sessions saved before the setup fix", 
   assert.deepEqual(migrated.finalVote.roundOne, { checked: "for" });
 });
 
+test("adopts a new observer classification without overwriting recorded attendance", () => {
+  const currentCatalog = [
+    { id: "new-observer", name: "Sudán (Observador)", observer: true, status: "occupied" },
+    { id: "recorded-observer", name: "Mozambique (Observador)", observer: true, status: "occupied" },
+  ];
+  const fallback = createInitialState(currentCatalog);
+  const migrated = normalizeSessionState({
+    ...fallback,
+    participants: currentCatalog.map((participant) => ({ ...participant, observer: false })),
+    attendance: { "new-observer": "pending", "recorded-observer": "absent" },
+  }, fallback);
+
+  assert.equal(migrated.attendance["new-observer"], "observer");
+  assert.equal(migrated.attendance["recorded-observer"], "absent");
+});
+
 test("keeps the current speaker visible after yielding and advances only on request", () => {
   const state = createInitialState([]);
   state.currentSpeaker = "México";

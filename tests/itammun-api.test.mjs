@@ -25,15 +25,19 @@ test("loads the live catalog and initially selects only occupied representations
       topics: [{ title: "Tópico original" }],
       representations: [
         { id: "mx", name: "México", flagUrl: "https://flags.example/mx.png", status: "occupied" },
+        { id: "sd", name: "Sudán (Observador)", flagUrl: "https://flags.example/sd.png", status: "occupied" },
         { id: "us", name: "Estados Unidos", flagUrl: "https://flags.example/us.png", status: "available" },
       ],
     },
   }));
 
   assert.equal(detail.source, "live");
-  assert.deepEqual(detail.initiallyAssignedRepresentationIds, ["mx"]);
+  assert.deepEqual(detail.initiallyAssignedRepresentationIds, ["mx", "sd"]);
   assert.equal(representationFullName(detail.representations[0], "en"), "Mexico");
-  assert.equal(representationFullName(detail.representations[1], "en"), "United States");
+  assert.equal(representationFullName(detail.representations[1], "en"), "Sudan (Observer)");
+  assert.equal(detail.representations[1].observer, true);
+  assert.equal(detail.representations[1].kind, "observer");
+  assert.equal(representationFullName(detail.representations[2], "en"), "United States");
   assert.match(detail.topics[0].titleByLanguage.en, /^Topic A:/);
 });
 

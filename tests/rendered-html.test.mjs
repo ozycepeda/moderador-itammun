@@ -61,7 +61,7 @@ test("redirects legacy setup and renders staged attendance and projector routes"
   assert.match(consoleHtml, /Seleccionar sesión de trabajo/);
   assert.match(consoleHtml, /Presente y votando/);
   assert.match(consoleHtml, /Observador/);
-  assert.match(consoleHtml, /Agregar representación disponible del catálogo|No fue posible cargar el catálogo/);
+  assert.match(consoleHtml, /Catálogo de ITAMMUN actualizado|No fue posible cargar el catálogo/);
   assert.doesNotMatch(consoleHtml, /Votación final/);
   assert.doesNotMatch(consoleHtml, />Mociones</);
   assert.doesNotMatch(consoleHtml, /Tiempo por orador/);

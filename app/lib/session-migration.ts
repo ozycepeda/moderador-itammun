@@ -50,7 +50,9 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
   const storedAttendance = stored.attendance ?? {};
   const attendance = Object.fromEntries(participants.map((participant) => [
     participant.id,
-    storedAttendance[participant.id] ?? (participant.observer ? "observer" : "pending"),
+    participant.observer && (!storedAttendance[participant.id] || storedAttendance[participant.id] === "pending")
+      ? "observer"
+      : storedAttendance[participant.id] ?? "pending",
   ])) as Record<string, AttendanceStatus>;
   const ballots = Object.fromEntries(Object.entries(stored.vote?.ballots ?? {}).filter((entry): entry is [string, VoteChoice] => (
     activeParticipantIds.has(entry[0]) && (entry[1] === "for" || entry[1] === "against")
