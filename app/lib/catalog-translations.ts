@@ -85,8 +85,8 @@ export const officialTopicTranslations: Record<string, LocalizedText[]> = {
       en: "Topic A: Strategies to prevent and combat migrant-smuggling networks along routes from Central and South America to North America",
     },
     {
-      es: "Tópico B: El papel de Meta, TikTok y Google en el reclutamiento infantil por el crimen organizado transnacional: vacíos de responsabilidad penal de las redes sociales como plataformas de captación en América Latina",
-      en: "Topic B: The role of Meta, TikTok, and Google in child recruitment by transnational organized crime: gaps in criminal accountability for social networks used as recruitment platforms in Latin America",
+      es: "Tópico B: Fortalecimiento de la cooperación internacional a través de INTERPOL para combatir el crimen y la violencia en contextos de debilitamiento institucional: el caso de Venezuela",
+      en: "Topic B: Strengthening international cooperation through INTERPOL to combat crime and violence in contexts of institutional weakening: the case of Venezuela",
     },
   ],
   otan: [
