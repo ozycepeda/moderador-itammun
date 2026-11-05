@@ -54,8 +54,13 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
       if (rawSetup) {
         try {
           const setup = JSON.parse(rawSetup) as StoredSetup;
-          const assignedParticipantIds = setup.assignedParticipantIds ?? setup.participants.map((participant) => participant.id);
-          const setupState = createInitialState(selectedParticipants(setup.participants, assignedParticipantIds));
+          const setupWithoutParticipants = setup.participants.length === 0;
+          const assignedParticipantIds = setupWithoutParticipants
+            ? initialStateRef.current.assignedParticipantIds
+            : setup.assignedParticipantIds ?? setup.participants.map((participant) => participant.id);
+          const setupState = setupWithoutParticipants
+            ? createInitialState(initialStateRef.current.participants)
+            : createInitialState(selectedParticipants(setup.participants, assignedParticipantIds));
           setState(withCarriedSpeakers(sessionKey, {
             ...setupState,
             session: {

@@ -42,9 +42,11 @@ export function normalizeSessionState(value: unknown, fallback: SessionState): S
     ...fallback.participants,
     ...storedParticipants.filter((storedParticipant) => !fallback.participants.some((participant) => participant.id === storedParticipant.id)),
   ];
-  const assignedParticipantIds = Array.isArray(stored.assignedParticipantIds)
+  const storedAssignedIds = Array.isArray(stored.assignedParticipantIds)
     ? stored.assignedParticipantIds.filter((id): id is string => typeof id === "string")
     : storedParticipants.map((participant) => participant.id);
+  // Una sesión abierta mientras el catálogo no respondía quedó sin países; se toman del catálogo actual.
+  const assignedParticipantIds = storedAssignedIds.length > 0 ? storedAssignedIds : fallback.assignedParticipantIds;
   const participants = selectedParticipants(participantPool, assignedParticipantIds);
   const activeParticipantIds = new Set(participants.map((participant) => participant.id));
   const storedAttendance = stored.attendance ?? {};
