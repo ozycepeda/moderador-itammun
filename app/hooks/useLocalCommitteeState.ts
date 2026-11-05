@@ -10,6 +10,26 @@ export function sessionStorageKey(sessionKey: string) {
   return `itammun:session:${sessionKey}`;
 }
 
+// Lista de oradores pendiente al cerrar una sesión; la siguiente sesión del comité la retoma.
+function carriedSpeakersKey(sessionKey: string) {
+  return `itammun:carried-speakers:${sessionKey}`;
+}
+
+function withCarriedSpeakers(sessionKey: string, state: SessionState): SessionState {
+  const raw = window.localStorage.getItem(carriedSpeakersKey(sessionKey));
+  if (!raw) return state;
+  window.localStorage.removeItem(carriedSpeakersKey(sessionKey));
+  try {
+    const participantIds = new Set(state.participants.map((participant) => participant.id));
+    const speakers = (JSON.parse(raw) as SessionState["speakers"])
+      .filter((item) => item.participantId && participantIds.has(item.participantId))
+      .map((item) => ({ ...item, id: crypto.randomUUID(), bonusSeconds: 0 }));
+    return { ...state, speakers };
+  } catch {
+    return state;
+  }
+}
+
 export function useLocalCommitteeState(sessionKey: string, initialState: SessionState) {
   const [state, setState] = useState(initialState);
   const [hydrated, setHydrated] = useState(false);
@@ -17,6 +37,7 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
   const channelRef = useRef<BroadcastChannel | null>(null);
   const receivedFromChannelRef = useRef(false);
   const closedRef = useRef(false);
+  const latestStateRef = useRef(initialState);
 
   useEffect(() => {
     const storedSession = window.localStorage.getItem(sessionStorageKey(sessionKey));
@@ -35,7 +56,7 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
           const setup = JSON.parse(rawSetup) as StoredSetup;
           const assignedParticipantIds = setup.assignedParticipantIds ?? setup.participants.map((participant) => participant.id);
           const setupState = createInitialState(selectedParticipants(setup.participants, assignedParticipantIds));
-          setState({
+          setState(withCarriedSpeakers(sessionKey, {
             ...setupState,
             session: {
               id: setup.sessionId ?? crypto.randomUUID(),
@@ -46,7 +67,7 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
             topic: setup.topic ?? "",
             phase: setup.topic ? "debate" : "attendance",
             assignedParticipantIds,
-          });
+          }));
         } catch {
           window.localStorage.removeItem(setupStorageKey(sessionKey));
           setState({
@@ -55,14 +76,14 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
           });
         }
       } else {
-        setState({
+        setState(withCarriedSpeakers(sessionKey, {
           ...initialStateRef.current,
           session: {
             ...initialStateRef.current.session,
             id: crypto.randomUUID(),
             startedAt: new Date().toISOString(),
           },
-        });
+        }));
       }
     }
     setHydrated(true);
@@ -87,6 +108,7 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
   }, [sessionKey]);
 
   useEffect(() => {
+    latestStateRef.current = state;
     if (!hydrated || closedRef.current) return;
     window.localStorage.setItem(sessionStorageKey(sessionKey), JSON.stringify(state));
     if (receivedFromChannelRef.current) {
@@ -102,6 +124,10 @@ export function useLocalCommitteeState(sessionKey: string, initialState: Session
 
   const closeSession = useCallback(() => {
     closedRef.current = true;
+    const pendingSpeakers = latestStateRef.current.speakers;
+    if (pendingSpeakers.length > 0) {
+      window.localStorage.setItem(carriedSpeakersKey(sessionKey), JSON.stringify(pendingSpeakers));
+    }
     channelRef.current?.postMessage({ type: "itammun:session-closed" });
     window.localStorage.removeItem(sessionStorageKey(sessionKey));
     window.localStorage.removeItem(setupStorageKey(sessionKey));
