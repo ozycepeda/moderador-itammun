@@ -156,24 +156,36 @@ export function blankCommitteeDetail(): CommitteeDetail {
   return { topics: [], representations: [], initiallyAssignedRepresentationIds: [], source: "blank" };
 }
 
+// El servidor del ITAM a veces tarda o no responde; pasado este tiempo se usa la copia guardada.
+const LIVE_CATALOG_TIMEOUT_MS = 2_000;
+
 export async function getCommitteeDetail(
   committee: Committee,
   fetcher: typeof fetch = fetch,
 ): Promise<CommitteeDetail> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), LIVE_CATALOG_TIMEOUT_MS); });
+  const live = await Promise.race([fetchLiveCommitteeDetail(committee, fetcher), timeout]);
+  clearTimeout(timer);
+  if (live) return live;
+  const snapshot = catalogSnapshot[committee.id] as PublicDebateResponse["debate"] | undefined;
+  if (snapshot) return committeeDetailFromDebate(committee, snapshot);
+  return { topics: [], representations: [], initiallyAssignedRepresentationIds: [], source: "unavailable" };
+}
+
+async function fetchLiveCommitteeDetail(committee: Committee, fetcher: typeof fetch): Promise<CommitteeDetail | null> {
   try {
     const response = await fetcher(`${catalogBaseUrl()}/debates/${encodeURIComponent(committee.id)}`, {
       cache: "no-store",
       headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.timeout(LIVE_CATALOG_TIMEOUT_MS),
     });
     if (!response.ok) throw new Error(`Catalog request failed with ${response.status}`);
     const payload = await response.json() as PublicDebateResponse;
     if (payload.ok !== true || payload.available !== true || !payload.debate) throw new Error("Committee unavailable");
     return committeeDetailFromDebate(committee, payload.debate);
   } catch {
-    const snapshot = catalogSnapshot[committee.id] as PublicDebateResponse["debate"] | undefined;
-    if (snapshot) return committeeDetailFromDebate(committee, snapshot);
-    return { topics: [], representations: [], initiallyAssignedRepresentationIds: [], source: "unavailable" };
+    return null;
   }
 }
 
