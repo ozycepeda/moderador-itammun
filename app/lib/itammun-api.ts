@@ -1,5 +1,6 @@
 import type { LocalizedText } from "./catalog-translations";
 import { topicTranslation } from "./catalog-translations";
+import { catalogSnapshot } from "./catalog-snapshot";
 import type { Committee } from "./committees";
 import type { Language } from "./i18n";
 
@@ -168,7 +169,17 @@ export async function getCommitteeDetail(
     if (!response.ok) throw new Error(`Catalog request failed with ${response.status}`);
     const payload = await response.json() as PublicDebateResponse;
     if (payload.ok !== true || payload.available !== true || !payload.debate) throw new Error("Committee unavailable");
+    return committeeDetailFromDebate(committee, payload.debate);
+  } catch {
+    const snapshot = catalogSnapshot[committee.id] as PublicDebateResponse["debate"] | undefined;
+    if (snapshot) return committeeDetailFromDebate(committee, snapshot);
+    return { topics: [], representations: [], initiallyAssignedRepresentationIds: [], source: "unavailable" };
+  }
+}
 
+function committeeDetailFromDebate(committee: Committee, debate: NonNullable<PublicDebateResponse["debate"]>): CommitteeDetail {
+  {
+    const payload = { debate };
     const representations = (payload.debate.representations ?? [])
       .map((item) => normalizeRepresentation(item, committee))
       .filter((item): item is Representation => item !== null);
@@ -187,7 +198,5 @@ export async function getCommitteeDetail(
       initiallyAssignedRepresentationIds: representations.filter((item) => item.status === "occupied").map((item) => item.id),
       source: "live",
     };
-  } catch {
-    return { topics: [], representations: [], initiallyAssignedRepresentationIds: [], source: "unavailable" };
   }
 }
